@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Transavner – ממיר טקסט עברי לקובץ אודיו MP3 עם תמיכה ב-OCR" />
+    <title>Transavner – ממיר עברית ל-MP3</title>
+
+    <!-- Hebrew font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- React 18 -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel standalone (compiles JSX in the browser – no build step needed) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tesseract.js v5 for Hebrew OCR -->
+    <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        font-size: 16px;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      body {
+        font-family: 'Heebo', system-ui, -apple-system, sans-serif;
+        direction: rtl;
+        background: linear-gradient(160deg, #eef2ff 0%, #f5f3ff 50%, #ede9fe 100%);
+        min-height: 100vh;
+      }
+
+      /* Scrollbar styling */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 3px; }
+
+      /* Range input track */
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 5px;
+        border-radius: 5px;
+        background: #e5e7eb;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #6366f1;
+        cursor: pointer;
+        box-shadow: 0 1px 4px rgba(99,102,241,0.4);
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #6366f1;
+        cursor: pointer;
+        border: none;
+      }
+
+      /* Audio player */
+      audio {
+        filter: none;
+      }
+      audio::-webkit-media-controls-panel {
+        background: #f5f3ff;
+      }
+
+      /* Prevent FOUC while Babel compiles */
+      #root:empty::after {
+        content: '';
+        display: block;
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #6366f1;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 40vh auto 0;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!--
+      The JSX file is compiled by Babel standalone at runtime.
+      It exposes window.HebrewToMp3Converter before the load event fires.
+    -->
+    <script type="text/babel" data-presets="react" src="hebrew-to-mp3-converter.jsx"></script>
+
+    <!--
+      Mount AFTER the load event so Babel has finished compiling
+      the external JSX script above.
+    -->
+    <script>
+      window.addEventListener('load', function () {
+        var root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(window.HebrewToMp3Converter));
+      });
+    </script>
+  </body>
+</html>

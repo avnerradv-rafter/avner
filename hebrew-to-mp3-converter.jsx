@@ -1,48 +1,693 @@
-import React, { useState } from 'react';
-import { saveAs } from 'file-saver';
+// ════════════════════════════════════════════════════════════════════
+//  Transavner – Hebrew Text-to-Audio Converter
+//  No build step required. Globals: React, Tesseract (from CDN).
+// ════════════════════════════════════════════════════════════════════
 
-const HebrewToMp3Converter = () => {
-    const [hebrewText, setHebrewText] = useState('');
-    const [audioUrl, setAudioUrl] = useState('');
+const { useState, useEffect, useRef, useCallback } = React;
 
-    const convertToMp3 = async () => {
-        // Call a text-to-speech API or library to convert the Hebrew text to audio
-        const response = await fetch('https://api.text-to-speech.yourservice.com/convert', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ text: hebrewText, language: 'he' })
-        });
+// ─── XML escaping for SSML (prevents injection from user text) ───────
+function escapeXml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            setAudioUrl(url);
-            saveAs(blob, 'hebrew_audio.mp3'); // Initiates a download
-        } else {
-            console.error('Conversion failed', response);
-        }
-    };
+// ─── Native file download (replaces file-saver) ──────────────────────
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  return url; // caller stores this for the audio player; cleanup via useEffect
+}
 
-    return (
-        <div>
-            <h1>Hebrew to MP3 Converter</h1>
-            <textarea
-                value={hebrewText}
-                onChange={(e) => setHebrewText(e.target.value)}
-                placeholder="Enter Hebrew text here"
-                rows="10"
-                cols="30"
-            ></textarea>
-            <br />
-            <button onClick={convertToMp3}>Convert to MP3</button>
-            <audio
-                controls
-                src={audioUrl}
-                style={{ display: audioUrl ? 'block' : 'none' }}>
-                Your browser does not support the audio element.
-            </audio>
+// ─── Google Cloud TTS ─────────────────────────────────────────────────
+async function googleTts(text, apiKey, { speed, pitch, voice }) {
+  const res = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        input: { text },
+        voice: { languageCode: 'he-IL', name: voice || 'he-IL-Wavenet-A' },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          speakingRate: speed,
+          // Google pitch is in semitones (-20 to +20); UI is 0.5–2.0
+          pitch: (pitch - 1.0) * 20,
+        },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `שגיאת Google TTS (${res.status})`);
+  }
+  const { audioContent } = await res.json();
+  const binary = atob(audioContent);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: 'audio/mpeg' });
+}
+
+// ─── Azure Cognitive Services TTS ────────────────────────────────────
+async function azureTts(text, apiKey, region, { speed, pitch }) {
+  const tokenRes = await fetch(
+    `https://${region}.api.cognitive.microsoft.com/sts/v1.0/issueToken`,
+    { method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': apiKey } }
+  );
+  if (!tokenRes.ok) throw new Error(`שגיאת אימות Azure (${tokenRes.status})`);
+  const token = await tokenRes.text();
+
+  const rateStr = speed >= 1
+    ? `+${Math.round((speed - 1) * 100)}%`
+    : `-${Math.round((1 - speed) * 100)}%`;
+  const pitchStr = pitch >= 1
+    ? `+${Math.round((pitch - 1) * 50)}Hz`
+    : `-${Math.round((1 - pitch) * 50)}Hz`;
+
+  const ssml = [
+    `<speak version='1.0' xml:lang='he-IL'>`,
+    `  <voice name='he-IL-AvriNeural'>`,
+    `    <prosody rate='${rateStr}' pitch='${pitchStr}'>${escapeXml(text)}</prosody>`,
+    `  </voice>`,
+    `</speak>`,
+  ].join('\n');
+
+  const synthRes = await fetch(
+    `https://${region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/ssml+xml',
+        'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+      },
+      body: ssml,
+    }
+  );
+  if (!synthRes.ok) throw new Error(`שגיאת Azure TTS (${synthRes.status})`);
+  return synthRes.blob();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Sub-components
+// ════════════════════════════════════════════════════════════════════
+
+function ErrorBanner({ message, onDismiss }) {
+  if (!message) return null;
+  return (
+    <div style={{
+      background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b',
+      borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      fontSize: 14, direction: 'rtl',
+    }}>
+      <span>⚠️ {message}</span>
+      <button onClick={onDismiss} style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: '#991b1b', fontSize: 18, lineHeight: 1, padding: '0 0 0 4px',
+      }}>×</button>
+    </div>
+  );
+}
+
+function SuccessBanner({ message, onDismiss }) {
+  if (!message) return null;
+  return (
+    <div style={{
+      background: '#f0fdf4', border: '1px solid #86efac', color: '#166534',
+      borderRadius: 10, padding: '12px 16px', marginBottom: 16,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      fontSize: 14, direction: 'rtl',
+    }}>
+      <span>✅ {message}</span>
+      <button onClick={onDismiss} style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: '#166534', fontSize: 18, lineHeight: 1, padding: '0 0 0 4px',
+      }}>×</button>
+    </div>
+  );
+}
+
+function ProgressBar({ progress, label }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
+        <span>{label}</span>
+        <span>{progress}%</span>
+      </div>
+      <div style={{ height: 8, background: '#e5e7eb', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${progress}%`,
+          background: 'linear-gradient(90deg, #6366f1, #8b5cf6)',
+          borderRadius: 99, transition: 'width 0.25s ease',
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function RangeControl({ label, value, min, max, step, onChange, displayValue }) {
+  return (
+    <div style={{ flex: 1, minWidth: 140 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{label}</label>
+        <span style={{ fontSize: 13, color: '#6366f1', fontWeight: 700 }}>{displayValue}</span>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#6366f1', cursor: 'pointer' }}
+      />
+    </div>
+  );
+}
+
+function SettingsModal({ settings, onSave, onClose }) {
+  const [local, setLocal] = useState({ ...settings });
+  const set = (k, v) => setLocal(prev => ({ ...prev, [k]: v }));
+
+  const inputCss = {
+    width: '100%', padding: '10px 14px', border: '1.5px solid #d1d5db',
+    borderRadius: 8, fontSize: 14, fontFamily: 'Heebo, system-ui, sans-serif',
+    direction: 'rtl', boxSizing: 'border-box', marginTop: 6, marginBottom: 14,
+    outline: 'none',
+  };
+  const labelCss = { fontSize: 13, fontWeight: 600, color: '#374151', display: 'block' };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff', borderRadius: 20, padding: '32px 28px',
+          width: '90%', maxWidth: 460, direction: 'rtl',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+        }}
+      >
+        <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 700, color: '#1e1b4b' }}>
+          ⚙️ הגדרות TTS
+        </h2>
+
+        <label style={labelCss}>ספק המרה לאודיו</label>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+          {[['google', 'Google Cloud TTS'], ['azure', 'Azure TTS']].map(([val, lbl]) => (
+            <button
+              key={val}
+              onClick={() => set('provider', val)}
+              style={{
+                flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+                background: local.provider === val ? '#6366f1' : '#f3f4f6',
+                color: local.provider === val ? '#fff' : '#374151',
+                border: local.provider === val ? '2px solid #6366f1' : '2px solid #e5e7eb',
+              }}
+            >{lbl}</button>
+          ))}
         </div>
-    );
-};
 
-export default HebrewToMp3Converter;
+        {local.provider !== 'azure' && (
+          <>
+            <label style={labelCss}>מפתח Google Cloud API</label>
+            <input
+              type="password" placeholder="AIza..." value={local.googleApiKey || ''}
+              onChange={e => set('googleApiKey', e.target.value)} style={inputCss}
+            />
+            <label style={labelCss}>קול</label>
+            <select value={local.googleVoice || 'he-IL-Wavenet-A'} onChange={e => set('googleVoice', e.target.value)} style={inputCss}>
+              <option value="he-IL-Wavenet-A">Wavenet-A – נשי</option>
+              <option value="he-IL-Wavenet-B">Wavenet-B – גברי</option>
+              <option value="he-IL-Wavenet-C">Wavenet-C – נשי</option>
+              <option value="he-IL-Wavenet-D">Wavenet-D – גברי</option>
+              <option value="he-IL-Standard-A">Standard-A – נשי</option>
+              <option value="he-IL-Standard-B">Standard-B – גברי</option>
+            </select>
+            <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20, marginTop: -8 }}>
+              קבל מפתח בחינם ← Google Cloud Console → Text-to-Speech API
+            </p>
+          </>
+        )}
+
+        {local.provider === 'azure' && (
+          <>
+            <label style={labelCss}>מפתח Azure API</label>
+            <input
+              type="password" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              value={local.azureApiKey || ''} onChange={e => set('azureApiKey', e.target.value)} style={inputCss}
+            />
+            <label style={labelCss}>אזור (Region)</label>
+            <input
+              type="text" placeholder="eastus"
+              value={local.azureRegion || 'eastus'} onChange={e => set('azureRegion', e.target.value)} style={inputCss}
+            />
+            <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20, marginTop: -8 }}>
+              קבל מפתח חינמי ← Azure Portal → Cognitive Services → Speech
+            </p>
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button
+            onClick={() => onSave(local)}
+            style={{
+              flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff',
+              fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >שמור</button>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '12px 0', borderRadius: 10,
+              border: '1.5px solid #e5e7eb', background: '#f9fafb', color: '#374151',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >ביטול</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  Main Component
+// ════════════════════════════════════════════════════════════════════
+
+function HebrewToMp3Converter() {
+  const [hebrewText, setHebrewText]   = useState('');
+  const [voices, setVoices]           = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
+  const [speed, setSpeed]             = useState(1.0);
+  const [pitch, setPitch]             = useState(1.0);
+  const [isSpeaking, setIsSpeaking]   = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [audioUrl, setAudioUrl]       = useState(null);
+  const [ocrStatus, setOcrStatus]     = useState('idle'); // idle | loading | done | error
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [isDragOver, setIsDragOver]   = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [error, setError]             = useState(null);
+  const [success, setSuccess]         = useState(null);
+  const [settings, setSettings]       = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('transavner_settings') || '{}');
+    } catch { return {}; }
+  });
+
+  const fileInputRef = useRef(null);
+  const prevAudioUrl = useRef(null);
+
+  // ── Load Hebrew voices from Web Speech API ─────────────────────
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    const load = () => {
+      const all = window.speechSynthesis.getVoices();
+      const heb = all.filter(v => v.lang.startsWith('he'));
+      const list = heb.length > 0 ? heb : all;
+      setVoices(list);
+      if (list.length > 0 && !selectedVoice) setSelectedVoice(list[0].name);
+    };
+    load();
+    window.speechSynthesis.addEventListener('voiceschanged', load);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
+  }, []);
+
+  // ── Cleanup stale object URLs ──────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (prevAudioUrl.current) URL.revokeObjectURL(prevAudioUrl.current);
+    };
+  }, [audioUrl]);
+
+  const saveSettings = useCallback((s) => {
+    localStorage.setItem('transavner_settings', JSON.stringify(s));
+    setSettings(s);
+    setShowSettings(false);
+    setSuccess('ההגדרות נשמרו');
+  }, []);
+
+  // ── Web Speech API preview ─────────────────────────────────────
+  const handlePreview = useCallback(() => {
+    if (!hebrewText.trim()) { setError('אנא הזן טקסט עברי'); return; }
+    if (!window.speechSynthesis) { setError('הדפדפן אינו תומך ב-Speech API'); return; }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(hebrewText);
+    utt.lang = 'he-IL';
+    utt.rate = speed;
+    utt.pitch = pitch;
+    if (selectedVoice) {
+      const v = voices.find(x => x.name === selectedVoice);
+      if (v) utt.voice = v;
+    }
+    utt.onstart = () => setIsSpeaking(true);
+    utt.onend   = () => { setIsSpeaking(false); setSuccess('הנגן הסתיים'); };
+    utt.onerror = e => { setIsSpeaking(false); setError(`שגיאת נגן: ${e.error}`); };
+    window.speechSynthesis.speak(utt);
+  }, [hebrewText, speed, pitch, selectedVoice, voices]);
+
+  const handleStopPreview = () => {
+    window.speechSynthesis?.cancel();
+    setIsSpeaking(false);
+  };
+
+  // ── TTS API convert + download ─────────────────────────────────
+  const handleConvert = async () => {
+    if (!hebrewText.trim()) { setError('אנא הזן טקסט'); return; }
+
+    const provider = settings.provider || 'google';
+    if (provider !== 'azure' && !settings.googleApiKey) {
+      setError('נא להגדיר מפתח Google API בהגדרות');
+      setShowSettings(true);
+      return;
+    }
+    if (provider === 'azure' && (!settings.azureApiKey || !settings.azureRegion)) {
+      setError('נא להגדיר מפתח Azure ואזור בהגדרות');
+      setShowSettings(true);
+      return;
+    }
+
+    setIsConverting(true);
+    setError(null);
+    try {
+      let blob;
+      if (provider === 'azure') {
+        blob = await azureTts(hebrewText, settings.azureApiKey, settings.azureRegion, { speed, pitch });
+      } else {
+        blob = await googleTts(hebrewText, settings.googleApiKey, {
+          speed, pitch, voice: settings.googleVoice,
+        });
+      }
+      if (prevAudioUrl.current) URL.revokeObjectURL(prevAudioUrl.current);
+      const url = triggerDownload(blob, `transavner_${Date.now()}.mp3`);
+      prevAudioUrl.current = url;
+      setAudioUrl(url);
+      setSuccess('הקובץ הומר והורד בהצלחה!');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
+  // ── Tesseract OCR ──────────────────────────────────────────────
+  const handleOcr = async (file) => {
+    if (!file?.type.startsWith('image/')) { setError('יש לבחור קובץ תמונה'); return; }
+    setOcrStatus('loading');
+    setOcrProgress(0);
+    setError(null);
+    try {
+      const result = await Tesseract.recognize(file, 'heb', {
+        logger: m => {
+          if (m.status === 'recognizing text')
+            setOcrProgress(Math.round(m.progress * 100));
+        },
+      });
+      const extracted = result.data.text.trim();
+      if (!extracted) throw new Error('לא נמצא טקסט בתמונה');
+      setHebrewText(prev => (prev ? prev + '\n' : '') + extracted);
+      setOcrStatus('done');
+      setSuccess(`חולץ טקסט (${extracted.length} תווים)`);
+    } catch (e) {
+      setOcrStatus('error');
+      setError('שגיאת OCR: ' + e.message);
+    }
+  };
+
+  // ── Drag-and-drop ──────────────────────────────────────────────
+  const handleDragOver = e => { e.preventDefault(); setIsDragOver(true); };
+  const handleDragLeave = () => setIsDragOver(false);
+  const handleDrop = e => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleOcr(file);
+  };
+
+  const wordCount = hebrewText.trim() ? hebrewText.trim().split(/\s+/).length : 0;
+  const hasKey = (settings.provider === 'azure')
+    ? !!(settings.azureApiKey && settings.azureRegion)
+    : !!settings.googleApiKey;
+
+  // ── Styles ────────────────────────────────────────────────────
+  const card = {
+    width: '100%', maxWidth: 700, background: '#fff',
+    borderRadius: 24, boxShadow: '0 8px 48px rgba(99,102,241,0.13)',
+    overflow: 'hidden',
+  };
+  const section = { padding: '20px 28px', borderBottom: '1px solid #f3f4f6' };
+  const btnBase = {
+    padding: '13px 28px', borderRadius: 12, fontSize: 15, fontWeight: 700,
+    cursor: 'pointer', border: 'none', fontFamily: 'Heebo, system-ui, sans-serif',
+    transition: 'opacity 0.15s, transform 0.1s', display: 'inline-flex',
+    alignItems: 'center', gap: 8,
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', padding: '32px 16px',
+      background: 'linear-gradient(160deg, #eef2ff 0%, #f5f3ff 50%, #ede9fe 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      fontFamily: 'Heebo, system-ui, sans-serif', direction: 'rtl',
+    }}>
+
+      {/* ── Logo / Header ── */}
+      <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 10 }}>🎙️</div>
+        <h1 style={{ margin: 0, fontSize: 36, fontWeight: 800, color: '#1e1b4b', letterSpacing: -1 }}>
+          Transavner
+        </h1>
+        <p style={{ margin: '6px 0 0', color: '#6b7280', fontSize: 16 }}>
+          ממיר טקסט עברי לאודיו MP3
+        </p>
+      </div>
+
+      <div style={card}>
+
+        {/* ── Top bar ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          padding: '14px 24px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13 }}>
+            {hasKey ? '🟢 מפתח API מוגדר' : '🔴 לא הוגדר מפתח API'}
+          </span>
+          <button
+            onClick={() => setShowSettings(true)}
+            style={{
+              background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 8, color: '#fff', cursor: 'pointer', padding: '6px 14px',
+              fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+            }}
+          >⚙️ הגדרות</button>
+        </div>
+
+        {/* ── Banners ── */}
+        <div style={{ padding: '0 24px' }}>
+          {error && <div style={{ paddingTop: 16 }}><ErrorBanner message={error} onDismiss={() => setError(null)} /></div>}
+          {success && <div style={{ paddingTop: 16 }}><SuccessBanner message={success} onDismiss={() => setSuccess(null)} /></div>}
+        </div>
+
+        {/* ── Text Input ── */}
+        <div style={section}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <label style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b' }}>טקסט עברי</label>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>{wordCount} מילים · {hebrewText.length} תווים</span>
+          </div>
+          <textarea
+            dir="rtl"
+            value={hebrewText}
+            onChange={e => setHebrewText(e.target.value)}
+            placeholder="הזן כאן טקסט עברי להמרה לאודיו..."
+            rows={7}
+            style={{
+              width: '100%', padding: '14px 16px', border: '1.5px solid #e5e7eb',
+              borderRadius: 12, fontSize: 16, lineHeight: 1.8, resize: 'vertical',
+              fontFamily: 'Heebo, system-ui, sans-serif', direction: 'rtl',
+              boxSizing: 'border-box', outline: 'none', color: '#111827',
+            }}
+            onFocus={e => (e.target.style.borderColor = '#6366f1')}
+            onBlur={e => (e.target.style.borderColor = '#e5e7eb')}
+          />
+          {hebrewText && (
+            <button
+              onClick={() => { setHebrewText(''); setAudioUrl(null); }}
+              style={{
+                marginTop: 8, background: 'none', border: 'none', cursor: 'pointer',
+                color: '#ef4444', fontSize: 13, padding: 0, fontFamily: 'inherit',
+              }}
+            >✕ נקה טקסט</button>
+          )}
+        </div>
+
+        {/* ── OCR Image Upload ── */}
+        <div style={section}>
+          <label style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', display: 'block', marginBottom: 10 }}>
+            🖼️ חילוץ טקסט מתמונה (OCR)
+          </label>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              border: `2px dashed ${isDragOver ? '#6366f1' : '#d1d5db'}`,
+              borderRadius: 14, padding: '32px 20px', textAlign: 'center',
+              cursor: 'pointer', background: isDragOver ? '#eef2ff' : '#fafafa',
+              transition: 'all 0.2s',
+            }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📂</div>
+            <p style={{ margin: 0, fontWeight: 600, color: '#374151', fontSize: 15 }}>
+              גרור תמונה לכאן
+            </p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: '#9ca3af' }}>
+              או לחץ לבחירת קובץ · JPG, PNG, TIFF
+            </p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={e => e.target.files[0] && handleOcr(e.target.files[0])}
+          />
+          {ocrStatus === 'loading' && (
+            <ProgressBar progress={ocrProgress} label="מזהה טקסט עברי בתמונה..." />
+          )}
+        </div>
+
+        {/* ── Voice Controls ── */}
+        <div style={{ ...section, borderBottom: 'none' }}>
+          <label style={{ fontWeight: 700, fontSize: 15, color: '#1e1b4b', display: 'block', marginBottom: 14 }}>
+            🎛️ הגדרות קול
+          </label>
+
+          {voices.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+                קול (תצוגה מקדימה בלבד)
+              </label>
+              <select
+                value={selectedVoice}
+                onChange={e => setSelectedVoice(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb',
+                  borderRadius: 8, fontSize: 14, fontFamily: 'Heebo, system-ui, sans-serif',
+                  direction: 'rtl', background: '#fff', outline: 'none',
+                }}
+              >
+                {voices.map(v => (
+                  <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+            <RangeControl
+              label="מהירות"
+              value={speed} min={0.5} max={2.0} step={0.1}
+              onChange={setSpeed}
+              displayValue={`×${speed.toFixed(1)}`}
+            />
+            <RangeControl
+              label="גובה קול"
+              value={pitch} min={0.5} max={2.0} step={0.1}
+              onChange={setPitch}
+              displayValue={`×${pitch.toFixed(1)}`}
+            />
+          </div>
+        </div>
+
+        {/* ── Action Buttons ── */}
+        <div style={{
+          padding: '20px 28px 28px',
+          display: 'flex', gap: 12, flexWrap: 'wrap',
+        }}>
+          {/* Preview */}
+          <button
+            onClick={isSpeaking ? handleStopPreview : handlePreview}
+            disabled={!hebrewText.trim() || ocrStatus === 'loading'}
+            style={{
+              ...btnBase,
+              flex: 1, minWidth: 160,
+              background: isSpeaking
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              color: '#fff',
+              opacity: (!hebrewText.trim() || ocrStatus === 'loading') ? 0.45 : 1,
+              cursor: (!hebrewText.trim() || ocrStatus === 'loading') ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isSpeaking ? '⏹ עצור' : '▶ תצוגה מקדימה'}
+          </button>
+
+          {/* Convert + Download */}
+          <button
+            onClick={handleConvert}
+            disabled={!hebrewText.trim() || isConverting || ocrStatus === 'loading'}
+            style={{
+              ...btnBase,
+              flex: 1, minWidth: 160,
+              background: hasKey
+                ? 'linear-gradient(135deg, #059669, #047857)'
+                : 'linear-gradient(135deg, #9ca3af, #6b7280)',
+              color: '#fff',
+              opacity: (!hebrewText.trim() || isConverting || ocrStatus === 'loading') ? 0.45 : 1,
+              cursor: (!hebrewText.trim() || isConverting || ocrStatus === 'loading') ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isConverting ? '⏳ ממיר...' : hasKey ? '⬇ הורד MP3' : '🔑 נדרש מפתח API'}
+          </button>
+        </div>
+
+        {/* ── Audio Player ── */}
+        {audioUrl && (
+          <div style={{ padding: '0 28px 28px' }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+              🎧 תצוגה מקדימה של הקובץ
+            </label>
+            <audio
+              controls
+              src={audioUrl}
+              style={{ width: '100%', borderRadius: 10 }}
+            />
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Footer ── */}
+      <p style={{ marginTop: 24, fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
+        Transavner · תצוגה מקדימה: Web Speech API · הורדה: Google Cloud TTS / Azure TTS
+      </p>
+
+      {/* ── Settings Modal ── */}
+      {showSettings && (
+        <SettingsModal
+          settings={settings}
+          onSave={saveSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Contract with index.html — must be last statement
+window.HebrewToMp3Converter = HebrewToMp3Converter;
