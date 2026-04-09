@@ -97,6 +97,61 @@ async function azureTts(text, apiKey, region, { speed, pitch }) {
   return synthRes.blob();
 }
 
+
+// ─── ElevenLabs TTS (supports voice cloning) ─────────────────────────
+async function elevenLabsTts(text, apiKey, voiceId) {
+  const res = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: 'eleven_multilingual_v2',
+        voice_settings: { stability: 0.5, similarity_boost: 0.85, style: 0.2 },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || `שגיאת ElevenLabs (${res.status})`);
+  }
+  return res.blob();
+}
+
+// ─── ElevenLabs Voice Clone ───────────────────────────────────────────
+async function createVoiceClone(apiKey, name, files) {
+  const form = new FormData();
+  form.append('name', name);
+  form.append('description', 'Voice clone created by Transavner');
+  files.forEach(f => form.append('files', f));
+  const res = await fetch('https://api.elevenlabs.io/v1/voices/add', {
+    method: 'POST',
+    headers: { 'xi-api-key': apiKey },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail?.message || err?.detail || `שגיאת יצירת קול (${res.status})`);
+  }
+  const { voice_id } = await res.json();
+  return voice_id;
+}
+
+// ─── List ElevenLabs voices ───────────────────────────────────────────
+async function listElevenLabsVoices(apiKey) {
+  const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+    headers: { 'xi-api-key': apiKey },
+  });
+  if (!res.ok) throw new Error(`שגיאת טעינת קולות (${res.status})`);
+  const { voices } = await res.json();
+  return voices;
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  Sub-components
 // ════════════════════════════════════════════════════════════════════
@@ -171,6 +226,132 @@ function RangeControl({ label, value, min, max, step, onChange, displayValue }) 
   );
 }
 
+
+function VoiceClonePanel({ apiKey, currentVoiceId, onVoiceCreated }) {
+  const [files, setFiles] = useState([]);
+  const [cloneName, setCloneName] = useState('הקול שלי');
+  const [isCloning, setIsCloning] = useState(false);
+  const [elVoices, setElVoices] = useState([]);
+  const [loadingVoices, setLoadingVoices] = useState(false);
+  const [cloneError, setCloneError] = useState(null);
+  const fileRef = useRef(null);
+
+  useEffect(() => {
+    if (!apiKey) return;
+    setLoadingVoices(true);
+    listElevenLabsVoices(apiKey)
+      .then(v => setElVoices(v))
+      .catch(() => {})
+      .finally(() => setLoadingVoices(false));
+  }, [apiKey]);
+
+  const handleClone = async () => {
+    if (!files.length) { setCloneError('יש להעלות לפחות קובץ אודיו אחד'); return; }
+    setIsCloning(true);
+    setCloneError(null);
+    try {
+      const id = await createVoiceClone(apiKey, cloneName, files);
+      onVoiceCreated(id, cloneName);
+    } catch (e) {
+      setCloneError(e.message);
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  const inputCss = {
+    width: '100%', padding: '10px 14px', border: '1.5px solid #d1d5db',
+    borderRadius: 8, fontSize: 14, fontFamily: 'Heebo, system-ui, sans-serif',
+    direction: 'rtl', boxSizing: 'border-box', marginTop: 6, marginBottom: 14, outline: 'none',
+  };
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {cloneError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b',
+          borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12 }}>
+          ⚠️ {cloneError}
+        </div>
+      )}
+
+      {/* Existing voices */}
+      {elVoices.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+            קולות קיימים בחשבון שלך
+          </label>
+          <select
+            value={currentVoiceId || ''}
+            onChange={e => onVoiceCreated(e.target.value, elVoices.find(v => v.voice_id === e.target.value)?.name || '')}
+            style={inputCss}
+          >
+            <option value="">— בחר קול —</option>
+            {elVoices.map(v => (
+              <option key={v.voice_id} value={v.voice_id}>
+                {v.name} {v.category === 'cloned' ? '🎤' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Create new clone */}
+      <div style={{ background: '#f5f3ff', borderRadius: 12, padding: '16px' }}>
+        <p style={{ fontWeight: 700, fontSize: 14, color: '#1e1b4b', marginBottom: 12 }}>
+          🎤 צור שיבוט קול חדש
+        </p>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block' }}>
+          שם הקול
+        </label>
+        <input
+          type="text" value={cloneName} onChange={e => setCloneName(e.target.value)}
+          style={inputCss}
+        />
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 6 }}>
+          הקלטות הקול שלך
+        </label>
+        <div
+          onClick={() => fileRef.current?.click()}
+          style={{
+            border: '2px dashed #c4b5fd', borderRadius: 10, padding: '20px',
+            textAlign: 'center', cursor: 'pointer', background: '#fff', marginBottom: 10,
+          }}
+        >
+          <div style={{ fontSize: 24 }}>🎙️</div>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: '#6b7280' }}>
+            לחץ להעלאת קבצי אודיו (MP3/WAV/M4A)
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
+            מומלץ: לפחות דקה של דיבור ברור בעברית
+          </p>
+        </div>
+        <input
+          ref={fileRef} type="file" accept="audio/*" multiple style={{ display: 'none' }}
+          onChange={e => setFiles(Array.from(e.target.files))}
+        />
+        {files.length > 0 && (
+          <div style={{ fontSize: 13, color: '#6366f1', marginBottom: 10 }}>
+            ✓ {files.length} קובץ/ים נבחרו: {files.map(f => f.name).join(', ')}
+          </div>
+        )}
+        <button
+          onClick={handleClone}
+          disabled={isCloning || !files.length}
+          style={{
+            width: '100%', padding: '11px', borderRadius: 10, border: 'none',
+            background: files.length ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#e5e7eb',
+            color: files.length ? '#fff' : '#9ca3af',
+            fontSize: 14, fontWeight: 700, cursor: files.length ? 'pointer' : 'not-allowed',
+            fontFamily: 'Heebo, system-ui, sans-serif',
+          }}
+        >
+          {isCloning ? '⏳ יוצר שיבוט קול...' : '✨ צור שיבוט קול'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function SettingsModal({ settings, onSave, onClose }) {
   const [local, setLocal] = useState({ ...settings });
   const set = (k, v) => setLocal(prev => ({ ...prev, [k]: v }));
@@ -204,13 +385,13 @@ function SettingsModal({ settings, onSave, onClose }) {
         </h2>
 
         <label style={labelCss}>ספק המרה לאודיו</label>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-          {[['google', 'Google Cloud TTS'], ['azure', 'Azure TTS']].map(([val, lbl]) => (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+          {[['google', 'Google TTS'], ['azure', 'Azure TTS'], ['elevenlabs', '🎤 ElevenLabs']].map(([val, lbl]) => (
             <button
               key={val}
               onClick={() => set('provider', val)}
               style={{
-                flex: 1, padding: '10px 16px', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                flex: 1, minWidth: 100, padding: '10px 12px', borderRadius: 8, fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
                 background: local.provider === val ? '#6366f1' : '#f3f4f6',
                 color: local.provider === val ? '#fff' : '#374151',
@@ -256,6 +437,35 @@ function SettingsModal({ settings, onSave, onClose }) {
             />
             <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20, marginTop: -8 }}>
               קבל מפתח חינמי ← Azure Portal → Cognitive Services → Speech
+            </p>
+          </>
+        )}
+
+        {local.provider === 'elevenlabs' && (
+          <>
+            <label style={labelCss}>מפתח ElevenLabs API</label>
+            <input
+              type="password" placeholder="sk_..."
+              value={local.elevenLabsApiKey || ''} onChange={e => set('elevenLabsApiKey', e.target.value)} style={inputCss}
+            />
+            {local.elevenLabsApiKey && (
+              <VoiceClonePanel
+                apiKey={local.elevenLabsApiKey}
+                currentVoiceId={local.elevenLabsVoiceId}
+                onVoiceCreated={(id, name) => {
+                  set('elevenLabsVoiceId', id);
+                  set('elevenLabsVoiceName', name);
+                }}
+              />
+            )}
+            {local.elevenLabsVoiceId && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8,
+                padding: '10px 14px', fontSize: 13, color: '#166534', marginBottom: 14 }}>
+                ✅ קול פעיל: <strong>{local.elevenLabsVoiceName || local.elevenLabsVoiceId}</strong>
+              </div>
+            )}
+            <p style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20, marginTop: -8 }}>
+              קבל מפתח חינמי ← elevenlabs.io → Profile → API Key
             </p>
           </>
         )}
@@ -369,13 +579,18 @@ function HebrewToMp3Converter() {
     if (!hebrewText.trim()) { setError('אנא הזן טקסט'); return; }
 
     const provider = settings.provider || 'google';
-    if (provider !== 'azure' && !settings.googleApiKey) {
+    if (provider === 'google' && !settings.googleApiKey) {
       setError('נא להגדיר מפתח Google API בהגדרות');
       setShowSettings(true);
       return;
     }
     if (provider === 'azure' && (!settings.azureApiKey || !settings.azureRegion)) {
       setError('נא להגדיר מפתח Azure ואזור בהגדרות');
+      setShowSettings(true);
+      return;
+    }
+    if (provider === 'elevenlabs' && (!settings.elevenLabsApiKey || !settings.elevenLabsVoiceId)) {
+      setError('נא להגדיר מפתח ElevenLabs ולבחור/ליצור קול בהגדרות');
       setShowSettings(true);
       return;
     }
@@ -386,6 +601,8 @@ function HebrewToMp3Converter() {
       let blob;
       if (provider === 'azure') {
         blob = await azureTts(hebrewText, settings.azureApiKey, settings.azureRegion, { speed, pitch });
+      } else if (provider === 'elevenlabs') {
+        blob = await elevenLabsTts(hebrewText, settings.elevenLabsApiKey, settings.elevenLabsVoiceId);
       } else {
         blob = await googleTts(hebrewText, settings.googleApiKey, {
           speed, pitch, voice: settings.googleVoice,
@@ -438,8 +655,10 @@ function HebrewToMp3Converter() {
   };
 
   const wordCount = hebrewText.trim() ? hebrewText.trim().split(/\s+/).length : 0;
-  const hasKey = (settings.provider === 'azure')
+  const hasKey = settings.provider === 'azure'
     ? !!(settings.azureApiKey && settings.azureRegion)
+    : settings.provider === 'elevenlabs'
+    ? !!(settings.elevenLabsApiKey && settings.elevenLabsVoiceId)
     : !!settings.googleApiKey;
 
   // ── Styles ────────────────────────────────────────────────────
@@ -652,7 +871,9 @@ function HebrewToMp3Converter() {
               cursor: (!hebrewText.trim() || isConverting || ocrStatus === 'loading') ? 'not-allowed' : 'pointer',
             }}
           >
-            {isConverting ? '⏳ ממיר...' : hasKey ? '⬇ הורד MP3' : '🔑 נדרש מפתח API'}
+            {isConverting ? '⏳ ממיר...' : hasKey
+            ? (settings.provider === 'elevenlabs' ? '🎤 הורד MP3 בקולך' : '⬇ הורד MP3')
+            : '🔑 נדרש מפתח API'}
           </button>
         </div>
 
