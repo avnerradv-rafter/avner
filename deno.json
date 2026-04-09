@@ -1,21 +1,20 @@
 {
   "lint": {
-    "exclude": [
-      "vendor/",
-      "hebrew-to-mp3-converter.jsx",
-      "index.html"
-    ]
+    "exclude": ["vendor", "vendor/**", "hebrew-to-mp3-converter.jsx", "index.html"],
+    "files": {
+      "exclude": ["vendor/", "hebrew-to-mp3-converter.jsx", "index.html"]
+    }
   },
   "fmt": {
-    "exclude": [
-      "vendor/",
-      "hebrew-to-mp3-converter.jsx",
-      "index.html"
-    ]
+    "exclude": ["vendor", "vendor/**", "hebrew-to-mp3-converter.jsx", "index.html"],
+    "files": {
+      "exclude": ["vendor/", "hebrew-to-mp3-converter.jsx", "index.html"]
+    }
   },
   "test": {
-    "exclude": [
-      "vendor/"
-    ]
+    "exclude": ["vendor", "vendor/**"],
+    "files": {
+      "exclude": ["vendor/"]
+    }
   }
 }

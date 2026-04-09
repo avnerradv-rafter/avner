@@ -1,3 +1,4 @@
+// deno-lint-ignore-file
 // ════════════════════════════════════════════════════════════════════
 //  Transavner – Hebrew Text-to-Audio Converter
 //  No build step required. Globals: React, Tesseract (from CDN).
