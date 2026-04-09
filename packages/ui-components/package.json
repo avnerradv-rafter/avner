@@ -1,0 +1,20 @@
+{
+  "name": "@safeconnect/ui-components",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src/"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-native": ">=0.76"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.0",
+    "@types/react-native": "~0.76.0",
+    "typescript": "^5.4.0"
+  }
+}

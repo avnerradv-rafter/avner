@@ -33,3 +33,4 @@ web-build/
 *.secret
 *.private
 private.pem
+.claude/
