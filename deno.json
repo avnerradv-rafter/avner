@@ -1,0 +1,17 @@
+{
+  "lint": {
+    "files": {
+      "exclude": ["vendor/", "hebrew-to-mp3-converter.jsx", "index.html"]
+    }
+  },
+  "fmt": {
+    "files": {
+      "exclude": ["vendor/", "hebrew-to-mp3-converter.jsx", "index.html"]
+    }
+  },
+  "test": {
+    "files": {
+      "exclude": ["vendor/"]
+    }
+  }
+}
