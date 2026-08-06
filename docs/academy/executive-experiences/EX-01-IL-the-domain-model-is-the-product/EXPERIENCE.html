@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EX-01-IL — מודל התחום הוא המוצר</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --ink: #14171a;
+    --muted: #5d666e;
+    --rule: #e0dcd5;
+    --accent: #7a2e2e;
+    --accent-soft: #f4ecec;
+    --mark: #96690a;
+    --on-accent: #ffffff;
+    --shadow: 0 1px 2px rgba(20,23,26,.05), 0 6px 20px rgba(20,23,26,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a; --panel: #1c2024; --ink: #e8e6e3; --muted: #99a2aa;
+      --rule: #2e343a; --accent: #d99a9a; --accent-soft: #241c1c; --mark: #d9b45a;
+      --on-accent: #14171a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171a; --panel: #1c2024; --ink: #e8e6e3; --muted: #99a2aa;
+    --rule: #2e343a; --accent: #d99a9a; --accent-soft: #241c1c; --mark: #d9b45a;
+    --on-accent: #14171a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaf8; --panel: #ffffff; --ink: #14171a; --muted: #5d666e;
+    --rule: #e0dcd5; --accent: #7a2e2e; --accent-soft: #f4ecec; --mark: #96690a;
+    --on-accent: #ffffff;
+    --shadow: 0 1px 2px rgba(20,23,26,.05), 0 6px 20px rgba(20,23,26,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 17px/1.75 "Assistant", "Rubik", "Heebo", "Noto Sans Hebrew",
+          "Arial Hebrew", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+  .ltr { direction: ltr; unicode-bidi: isolate; display: inline-block; }
+
+  .eyebrow {
+    font-size: .74rem; font-weight: 700; letter-spacing: .1em;
+    color: var(--accent); direction: ltr; text-align: right;
+  }
+  h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem); line-height: 1.2;
+    margin: .7rem 0 .4rem; font-weight: 700; letter-spacing: -.01em;
+  }
+  .standfirst { color: var(--muted); font-size: 1.1rem; margin: 0 0 1.5rem; }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem;
+    padding: .9rem 0; margin-bottom: 3rem;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    font-size: .88rem; color: var(--muted);
+  }
+  .meta b { color: var(--ink); font-weight: 700; }
+
+  section { margin: 0 0 3.25rem; }
+  .seg {
+    display: flex; align-items: baseline; gap: .75rem;
+    font-size: .76rem; font-weight: 700; letter-spacing: .05em;
+    color: var(--muted); margin-bottom: .6rem;
+  }
+  .seg .n {
+    display: inline-grid; place-items: center; flex: none;
+    width: 1.7rem; height: 1.7rem; border-radius: 50%;
+    background: var(--accent); color: var(--on-accent); font-size: .82rem;
+  }
+  .seg .t { margin-inline-start: auto; }
+
+  h2 { font-size: 1.55rem; line-height: 1.35; margin: 0 0 .7rem; font-weight: 700; }
+  p { margin: 0 0 1rem; }
+  .lede { font-size: 1.06rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 1.4rem 1.5rem; box-shadow: var(--shadow); margin: 1.25rem 0;
+  }
+
+  .ask {
+    border-inline-start: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 1rem 1.25rem; border-radius: 8px; margin: 1.25rem 0;
+  }
+  .ask .label {
+    font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+    color: var(--accent); display: block; margin-bottom: .45rem;
+  }
+  .ask p { margin: 0; font-size: 1.14rem; font-weight: 600; }
+
+  .rule-line { border: 0; border-top: 1px dashed var(--rule); margin: 1.15rem 0; height: 0; }
+  .write .rule-line:first-child { margin-top: .4rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: .96rem; }
+  th, td { text-align: start; padding: .65rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: .78rem; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
+  td.box { white-space: nowrap; color: var(--muted); font-size: .92rem; }
+  .scroll { overflow-x: auto; }
+
+  .obj { border-top: 2px solid var(--ink); padding-top: .8rem; margin: 1.7rem 0 0; }
+  .obj h3 { font-size: 1.05rem; margin: 0 0 .1rem; font-weight: 700; }
+  .obj .hint { color: var(--muted); font-size: .88rem; margin: 0 0 .3rem; }
+
+  .gate { border: 1px solid var(--mark); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; font-size: .96rem; }
+  .gate strong { color: var(--mark); }
+
+  details.reveal {
+    border: 1px solid var(--rule); border-radius: 10px; background: var(--panel);
+    overflow: hidden; margin: 1.5rem 0; box-shadow: var(--shadow);
+  }
+  details.reveal > summary {
+    cursor: pointer; padding: 1.1rem 1.4rem; list-style: none;
+    font-size: .86rem; font-weight: 700; letter-spacing: .05em; color: var(--accent);
+  }
+  details.reveal > summary::-webkit-details-marker { display: none; }
+  details.reveal > summary::after { content: " ◂"; }
+  details.reveal[open] > summary { border-bottom: 1px solid var(--rule); }
+  details.reveal[open] > summary::after { content: " ▾"; }
+  .reveal-body { padding: 1.4rem; }
+
+  blockquote.thesis {
+    margin: 0 0 1.25rem; padding: 0 1.1rem 0 0;
+    border-inline-start: 3px solid var(--accent);
+    padding-inline-start: 1.1rem; padding-inline-end: 0;
+    font-size: 1.2rem; line-height: 1.6; font-weight: 600;
+  }
+
+  footer {
+    margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);
+    font-size: .86rem; line-height: 1.7; color: var(--muted);
+  }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 11.5pt; }
+    .wrap { padding: 0; max-width: none; }
+    .card, details.reveal { box-shadow: none; break-inside: avoid; }
+    section { break-inside: avoid; }
+    details.reveal > summary { color: #000; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">EX-01-IL · חוויית הנהלה</div>
+    <h1>מודל התחום הוא המוצר</h1>
+    <p class="standfirst">איזה שדה חסר שובר איזו הבטחה?</p>
+    <div class="meta">
+      <span><b>90 דקות</b></span>
+      <span>מונחה · בזוגות</span>
+      <span>לא נדרש רקע טכני</span>
+      <span><b>לא תקראו היום שורת קוד אחת</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="seg"><span class="n">1</span><span>ההימור הפותח</span><span class="t">5 דקות</span></div>
+    <h2>שלוש שאלות</h2>
+    <p class="lede">רשמו שלוש שאלות שמערכת ראויה למשרד שלכם הייתה צריכה לדעת לענות עליהן מיד. אל תדונו בהן עם אף אחד. נחזור אליהן בסוף.</p>
+    <div class="card write">
+      <hr class="rule-line"><hr class="rule-line"><hr class="rule-line">
+    </div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">2</span><span>מבדק הערכאות</span><span class="t">10 דקות</span></div>
+    <h2>מה המערכת לא מסוגלת לומר?</h2>
+    <p>הדרך המהירה להבין מערכת אינה לרשום מה היא עושה, אלא למצוא מה היא <strong>אינה מסוגלת לבטא</strong>. בזוגות, נסו לרשום כל אחת מהעובדות הבאות במערכת שמולכם.</p>
+    <p><em>אל תתכננו פתרון. אל תתווכחו אם זה חשוב. רשמו רק מה קרה כשניסיתם.</em></p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th style="width:2rem">#</th><th>נסו לרשום את העובדה הזאת</th><th style="width:9.5rem">האם הצליח?</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>ערכאה ומספר מזהה</strong> — מספר הליך בנט המשפט, מספר תיק בהוצאה לפועל, תיק אצל הרשם לענייני ירושה, או אסמכתת שומה עצמית במיסוי מקרקעין</td><td class="box">☐ כן ☐ חלקית ☐ לא</td></tr>
+        <tr><td>2</td><td><strong>אותו סכסוך עצמו</strong> — הקיים במקביל כפסק דין וכתיק הוצאה לפועל</td><td class="box">☐ כן ☐ חלקית ☐ לא</td></tr>
+        <tr><td>3</td><td><strong>מועד סטטוטורי</strong> — יחד עם ההוראה שממנה הוא נגזר</td><td class="box">☐ כן ☐ חלקית ☐ לא</td></tr>
+        <tr><td>4</td><td><strong>הצד שכנגד</strong> — ומי מייצג אותו</td><td class="box">☐ כן ☐ חלקית ☐ לא</td></tr>
+        <tr><td>5</td><td><strong>תיק שהסתיים</strong> — והתוצאה שלו</td><td class="box">☐ כן ☐ חלקית ☐ לא</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>במשפט אחד בלבד.</strong> לפי מה שהמערכת לא הצליחה לבטא — מה היא בעצם?</p>
+    <div class="card write"><hr class="rule-line"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">3</span><span>הדגמה</span><span class="t">12 דקות</span></div>
+    <h2>המועד ששייך ללקוח</h2>
+    <p>המנחה ייצור מועד דיון ויקשור אותו ללקוח אחד. ללקוח הזה ארבעה תיקים פעילים במשרד: תיק ליטיגציה, עסקת מקרקעין, תיק מיסוי מקרקעין ותיק בהוצאה לפועל.</p>
+    <p>מיד לאחר מכן ייפתח כל אחד מארבעת התיקים, בזה אחר זה.</p>
+    <div class="ask">
+      <span class="label">התחייבו לתשובה לפני החשיפה</span>
+      <p>באיזה מארבעת התיקים יופיע המועד?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">4</span><span>מעקב הבטחות</span><span class="t">18 דקות</span></div>
+    <h2>מה חייב להתקיים כדי שזה יהיה נכון?</h2>
+    <p>כל הבטחה נשענת על מבנה שמסוגל לקיים אותה. כאשר המבנה חסר, ההבטחה מעולם לא תורגמה למודל — ושום עבודת ממשק לא תציל אותה.</p>
+    <p>ארבע המטרות שלפניכם נלקחו מהמשרד שלכם: מהמערכת שאתם שוקלים לרכוש, מהכלי שאתם בונים, או ממה שהובטח לכם. עבור כל מטרה, נסחו את ה<strong>ישות</strong> ואת ה<strong>קשר</strong> הנדרשים כדי לקיים אותה — ואז הכריעו.</p>
+
+    <div class="obj">
+      <h3>מטרה 1</h3>
+      <p class="hint">המנחה ירשום כאן את המטרה הראשונה שהמשרד סיפק.</p>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.7rem 0 0" class="box">☐ מתקיימת &nbsp;&nbsp; ☐ בלתי אפשרית — המבנה החסר הוא: ____________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <h3>מטרה 2</h3>
+      <p class="hint">המנחה ירשום כאן את המטרה השנייה שהמשרד סיפק.</p>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.7rem 0 0" class="box">☐ מתקיימת &nbsp;&nbsp; ☐ בלתי אפשרית — המבנה החסר הוא: ____________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <h3>מטרה 3</h3>
+      <p class="hint">המנחה ירשום כאן את המטרה השלישית שהמשרד סיפק.</p>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.7rem 0 0" class="box">☐ מתקיימת &nbsp;&nbsp; ☐ בלתי אפשרית — המבנה החסר הוא: ____________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <h3>מטרה 4</h3>
+      <p class="hint">המנחה ירשום כאן את המטרה הרביעית שהמשרד סיפק.</p>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.7rem 0 0" class="box">☐ מתקיימת &nbsp;&nbsp; ☐ בלתי אפשרית — המבנה החסר הוא: ____________________</p>
+      </div>
+    </div>
+
+    <div class="gate">
+      <p style="margin:0"><strong>הכלל.</strong> הבטחה שסומנה כבלתי אפשרית חייבת לנקוב במבנה החסר.<br>
+      <em>״בלתי אפשרית כי המערכת בנויה גרוע״</em> — נכשל.<br>
+      <em>״בלתי אפשרית כי אין ישות של דיון״</em> — עובר.</p>
+    </div>
+    <p><strong>מתוך ארבע המטרות, כמה מהן ניתנות לקיום על המודל שנבנה בפועל?</strong> &nbsp; ____ מתוך 4</p>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">5</span><span>הדגמה</span><span class="t">15 דקות</span></div>
+    <h2>הדוח ששותק וטועה</h2>
+    <p>המנחה ירשום כמה תיקים מוצגים כרגע בלוח המחוונים, וייצור תיק אחד נוסף. את הסטטוס של התיק החדש הוא יקליד בעברית — בדיוק כפי שחצי מהמשרד מקליד אותו ממילא.</p>
+    <div class="ask">
+      <span class="label">התחייבו לתשובה לפני החשיפה</span>
+      <p>כמה תיקים יציג לוח המחוונים עכשיו?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+    <p>לאחר החשיפה, שימו לב לדבר אחד לפני כל דבר אחר: <strong>מה בדיוק התריע?</strong></p>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">6</span><span>הדגמה</span><span class="t">8 דקות</span></div>
+    <h2>העמודה שנשרה</h2>
+    <p>המנחה יציג זה לצד זה את המסך שהמעצבים אפיינו ואת המסך שנבנה בפועל.</p>
+    <div class="ask">
+      <span class="label">התחייבו לתשובה לפני החשיפה</span>
+      <p>מה חסר במסך שנבנה — ולמה לדעתכם הוא נעלם?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">7</span><span>התכנסות</span><span class="t">12 דקות</span></div>
+    <h2>מה בעצם ראיתם?</h2>
+    <p>שלושה כשלים. מועד שלא הופיע. מספר שגוי. עמודה שנעלמה. לפני שתפתחו את הפאנל שלמטה — ואל תפתחו אותו מוקדם — החליטו מה משותף לשלושתם.</p>
+
+    <details class="reveal">
+      <summary>לפתוח רק כשהמנחה יגיד</summary>
+      <div class="reveal-body">
+        <blockquote class="thesis">מערכת מוגדרת על ידי הישויות שלה והקשרים ביניהן, ולא על ידי המסכים שלה. כל כשל ברמת המסך שראיתם היום הוא כשל של מודל התחום בתחפושת.</blockquote>
+        <div class="scroll">
+        <table>
+          <thead><tr><th>מה ראיתם</th><th>מה זה היה באמת</th></tr></thead>
+          <tbody>
+            <tr><td>המועד שלא הופיע</td><td><strong>קשר חסר</strong> — כל דבר שיש לו תאריך שייך לתיק, לא ללקוח</td></tr>
+            <tr><td>המספר השגוי</td><td><strong>אוצר מילים חסר</strong> — כל סיווג הוא רשימת ערכים מבוקרת, בשפה אחת</td></tr>
+            <tr><td>העמודה החסרה</td><td><strong>אותו קשר חסר בדיוק</strong>, שצף במקום אחר</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p style="margin-bottom:0">אף אחד מהכשלים האלה לא היה כשל עיצוב, ואף אחד מהם לא נתפס בבדיקות. לוח המחוונים החזיר את התשובה הנכונה לשאילתה שהוא הריץ. למסך פשוט לא היה מה להציג. והמועד נשמר בדיוק כפי שהוקלד.</p>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">8</span><span>השאלה שאתם לוקחים איתכם</span><span class="t">10 דקות</span></div>
+    <h2>המערכת שלכם</h2>
+    <p>חזרו לשלוש השאלות שרשמתם בהתחלה. בחרו אחת מהן, ותרגמו אותה לצורה שתרגלתם כאן לאורך כל הבוקר:</p>
+    <div class="ask">
+      <p>באיזו ישות ובאיזה קשר השאלה הזאת תלויה — והאם הם קיימים אצלנו?</p>
+    </div>
+    <div class="card write">
+      <hr class="rule-line"><hr class="rule-line"><hr class="rule-line">
+    </div>
+    <p>השאלה הזאת היא התוצר. היא לא עולה דבר, לוקח בערך ארבע דקות לענות עליה, והיא הדבר הזול ביותר שאפשר לעשות למפת דרכים או להצעת מחיר לפני שמאשרים אותן.</p>
+  </section>
+
+  <footer>
+    <p><strong>EX-01-IL · מודל התחום הוא המוצר · גרסה 1.0</strong><br>
+    חוויית הנהלה של האקדמיה. נגזרת ממחקר המקרה <span class="ltr">CS-001</span> ומהספריות הקבועות.<br>
+    כל ההדגמות מתבצעות על עותק מקומי עם נתונים סינתטיים בלבד. בשום שלב לא נעשה שימוש בנתוני לקוח אמיתיים.</p>
+  </footer>
+
+</div>
+</body>
+</html>

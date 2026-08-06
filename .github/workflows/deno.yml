@@ -38,5 +38,6 @@ jobs:
       - name: Run linter
         run: deno lint
 
-      - name: Run tests
-        run: deno test -A
+      # No test step: this repository contains no Deno test modules, and
+      # `deno test` exits non-zero with "No test modules found" rather than
+      # treating an empty suite as a pass. Restore it when tests exist.

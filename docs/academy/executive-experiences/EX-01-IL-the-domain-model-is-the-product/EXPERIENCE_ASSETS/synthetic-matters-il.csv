@@ -1,0 +1,19 @@
+﻿matter_ref,client_ref,practice_area,forum,forum_ref,status,opened_on,responsible,note
+SYN-101,CL-001,ליטיגציה,בית משפט השלום,ת"א 11234-02-26,Open,2026-02-04,עו"ד א,Recognised status
+SYN-102,CL-001,מסחרי וחוזים,—,—,In Progress,2026-02-18,עו"ד ב,Recognised status
+SYN-103,CL-002,ליטיגציה,בית משפט מחוזי,ת"א 22415-01-26,Closed,2026-01-12,עו"ד א,FORUM PAIR — judgment obtained
+SYN-104,CL-002,הוצאה לפועל,לשכת הוצאה לפועל,01-22415-26-4,In Progress,2026-03-02,עו"ד ג,FORUM PAIR — same dispute as SYN-103; unrelated identifier
+SYN-105,CL-003,משפחה וירושה,בית משפט לענייני משפחה,תמ"ש 33108-02-26,Open,2026-02-22,עו"ד ד,Recognised status
+SYN-106,CL-003,משפחה וירושה,הרשם לענייני ירושה,1187/26,In Progress,2026-03-06,עו"ד ד,Third forum type
+SYN-107,CL-004,ליטיגציה,בית משפט השלום,ת"א 44290-01-26,In Progress,2026-01-27,עו"ד א,CLIENT CLUSTER — matter 1 of 4
+SYN-108,CL-004,מקרקעין,—,—,In Progress,2026-02-09,עו"ד ה,CLIENT CLUSTER — matter 2 of 4
+SYN-109,CL-004,מיסוי מקרקעין,מיסוי מקרקעין,שע-44290-26,Open,2026-02-11,עו"ד ה,CLIENT CLUSTER — matter 3 of 4
+SYN-110,CL-004,הוצאה לפועל,לשכת הוצאה לפועל,01-44290-26-9,Open,2026-03-19,עו"ד ג,CLIENT CLUSTER — matter 4 of 4; same dispute as SYN-107
+SYN-111,CL-005,מקרקעין,—,—,Closed,2026-01-30,עו"ד ה,Recognised status
+SYN-112,CL-005,מיסוי מקרקעין,מיסוי מקרקעין,שע-51876-26,בטיפול,2026-03-24,עו"ד ה,DRIFT — Hebrew value; primary D1-IL row
+SYN-113,CL-006,ליטיגציה,בית משפט השלום,ת"א 55731-03-26,פתוח,2026-03-11,עו"ד ב,DRIFT — Hebrew equivalent of a recognised value
+SYN-114,CL-006,מסחרי וחוזים,—,—,ממתין ללקוח,2026-03-15,עו"ד ב,DRIFT — operational state the model never anticipated
+SYN-115,CL-007,הוצאה לפועל,לשכת הוצאה לפועל,01-66302-26-1,הסתיים,2026-02-28,עו"ד ג,DRIFT — Hebrew equivalent of Closed
+SYN-116,CL-007,מקרקעין,—,—,OPEN,2026-04-02,עו"ד ה,DRIFT — recognised value MIS-CASED. Hold this row in reserve
+SYN-117,CL-008,מיסוי מקרקעין,מיסוי מקרקעין,שע-70914-26,In Progress ,2026-04-08,עו"ד ה,DRIFT — trailing whitespace only; looks identical on screen
+SYN-118,CL-008,משפחה וירושה,בית משפט לענייני משפחה,תמ"ש 70915-04-26,Open,2026-04-14,עו"ד ד,Recognised status

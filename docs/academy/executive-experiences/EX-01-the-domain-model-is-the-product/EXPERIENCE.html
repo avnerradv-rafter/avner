@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EX-01 — The Domain Model Is the Product</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --ink: #14171a;
+    --muted: #5d666e;
+    --rule: #e0dcd5;
+    --accent: #7a2e2e;
+    --accent-soft: #f4ecec;
+    --mark: #b8860b;
+    --shadow: 0 1px 2px rgba(20,23,26,.05), 0 6px 20px rgba(20,23,26,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a; --panel: #1c2024; --ink: #e8e6e3; --muted: #99a2aa;
+      --rule: #2e343a; --accent: #d99a9a; --accent-soft: #241c1c; --mark: #d9b45a;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171a; --panel: #1c2024; --ink: #e8e6e3; --muted: #99a2aa;
+    --rule: #2e343a; --accent: #d99a9a; --accent-soft: #241c1c; --mark: #d9b45a;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaf8; --panel: #ffffff; --ink: #14171a; --muted: #5d666e;
+    --rule: #e0dcd5; --accent: #7a2e2e; --accent-soft: #f4ecec; --mark: #b8860b;
+    --shadow: 0 1px 2px rgba(20,23,26,.05), 0 6px 20px rgba(20,23,26,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 17px/1.65 ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+
+  .eyebrow {
+    font: 600 .72rem/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+  }
+  h1 {
+    font-size: clamp(2rem, 5.5vw, 2.9rem); line-height: 1.12;
+    margin: .7rem 0 .5rem; font-weight: 600; letter-spacing: -.015em;
+  }
+  .standfirst { color: var(--muted); font-size: 1.08rem; margin: 0 0 1.5rem; }
+
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .5rem 1.5rem;
+    padding: .9rem 0; margin-bottom: 3rem;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    font: 400 .85rem/1.4 ui-sans-serif, system-ui, sans-serif; color: var(--muted);
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  section { margin: 0 0 3.25rem; }
+  .seg {
+    display: flex; align-items: baseline; gap: .75rem;
+    font: 600 .72rem/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+    margin-bottom: .6rem;
+  }
+  .seg .n {
+    display: inline-grid; place-items: center; flex: none;
+    width: 1.6rem; height: 1.6rem; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: .78rem; letter-spacing: 0;
+  }
+  @media (prefers-color-scheme: dark) { .seg .n { color: #14171a; } }
+  :root[data-theme="dark"] .seg .n { color: #14171a; }
+  :root[data-theme="light"] .seg .n { color: #fff; }
+  .seg .t { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  h2 { font-size: 1.5rem; line-height: 1.25; margin: 0 0 .7rem; font-weight: 600; letter-spacing: -.01em; }
+  p { margin: 0 0 1rem; }
+  .lede { font-size: 1.05rem; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 1.4rem 1.5rem; box-shadow: var(--shadow); margin: 1.25rem 0;
+  }
+
+  .ask {
+    border-left: 3px solid var(--accent); background: var(--accent-soft);
+    padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin: 1.25rem 0;
+  }
+  .ask .label {
+    font: 600 .7rem/1 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--accent);
+    display: block; margin-bottom: .5rem;
+  }
+  .ask p { margin: 0; font-size: 1.12rem; font-style: italic; }
+
+  .rule-line { border: 0; border-top: 1px dashed var(--rule); margin: .9rem 0; height: 0; }
+  .write { margin: 1rem 0 0; }
+  .write .rule-line:first-child { margin-top: 1.4rem; }
+
+  table { width: 100%; border-collapse: collapse; margin: 1.25rem 0; font-size: .95rem; }
+  th, td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font: 600 .72rem/1.3 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+  td.box { white-space: nowrap; color: var(--muted); font-size: .9rem; }
+  .scroll { overflow-x: auto; }
+
+  .obj { border-top: 2px solid var(--ink); padding-top: .8rem; margin: 1.6rem 0 0; }
+  .obj h3 { font-size: 1.08rem; margin: 0 0 .15rem; font-weight: 600; }
+  .obj .tag {
+    font: 600 .66rem/1 ui-sans-serif, system-ui, sans-serif; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--mark);
+  }
+
+  .gate {
+    border: 1px solid var(--mark); border-radius: 8px; padding: 1rem 1.25rem;
+    margin: 1.5rem 0; font-size: .95rem;
+  }
+  .gate strong { color: var(--mark); }
+
+  details.reveal {
+    border: 1px solid var(--rule); border-radius: 10px; background: var(--panel);
+    padding: 0; overflow: hidden; margin: 1.5rem 0; box-shadow: var(--shadow);
+  }
+  details.reveal > summary {
+    cursor: pointer; padding: 1.1rem 1.4rem; list-style: none;
+    font: 600 .8rem/1.4 ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--accent);
+  }
+  details.reveal > summary::-webkit-details-marker { display: none; }
+  details.reveal > summary::after { content: " ▸"; }
+  details.reveal[open] > summary { border-bottom: 1px solid var(--rule); }
+  details.reveal[open] > summary::after { content: " ▾"; }
+  .reveal-body { padding: 1.4rem; }
+
+  blockquote.thesis {
+    margin: 0 0 1.25rem; padding: 0 0 0 1.1rem; border-left: 3px solid var(--accent);
+    font-size: 1.22rem; line-height: 1.45;
+  }
+
+  footer {
+    margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--rule);
+    font: 400 .82rem/1.6 ui-sans-serif, system-ui, sans-serif; color: var(--muted);
+  }
+  footer a { color: inherit; }
+
+  @media print {
+    body { background: #fff; color: #000; font-size: 11.5pt; }
+    .wrap { padding: 0; max-width: none; }
+    .card, details.reveal { box-shadow: none; break-inside: avoid; }
+    section { break-inside: avoid; }
+    details.reveal > summary { color: #000; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Executive Experience EX-01</div>
+    <h1>The Domain Model Is the Product</h1>
+    <p class="standfirst">Which absent field breaks which promise?</p>
+    <div class="meta">
+      <span><b>90 minutes</b></span>
+      <span>Facilitated · pairs</span>
+      <span>No technical background required</span>
+      <span><b>You will not read any code today</b></span>
+    </div>
+  </header>
+
+  <section>
+    <div class="seg"><span class="n">1</span><span>The opening wager</span><span class="t">5 min</span></div>
+    <h2>Three questions</h2>
+    <p class="lede">Write down three questions a competent system for your practice should be able to answer instantly. Don't discuss them with anyone. You'll come back to these at the end.</p>
+    <div class="card write">
+      <hr class="rule-line"><hr class="rule-line"><hr class="rule-line">
+    </div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">2</span><span>The absence audit</span><span class="t">15 min</span></div>
+    <h2>What can't it say?</h2>
+    <p>The fastest way to understand a system is not to list what it does. It is to find what it <strong>cannot express</strong>. In pairs, attempt each fact below against the system in front of you.</p>
+    <p><em>Do not design a fix. Do not debate whether it matters. Record only what happens when you try.</em></p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th style="width:2rem">#</th><th>Try to record this fact</th><th style="width:9rem">Can it?</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td><strong>A hearing</strong> — this matter, before this court, on this date</td><td class="box">☐ Yes ☐ Partly ☐ No</td></tr>
+        <tr><td>2</td><td><strong>A court</strong> — which forum, and its jurisdiction</td><td class="box">☐ Yes ☐ Partly ☐ No</td></tr>
+        <tr><td>3</td><td><strong>An opposing party</strong> — who is on the other side, and who acts for them</td><td class="box">☐ Yes ☐ Partly ☐ No</td></tr>
+        <tr><td>4</td><td><strong>A limitation date</strong> — the deadline to bring the claim, and the rule behind it</td><td class="box">☐ Yes ☐ Partly ☐ No</td></tr>
+        <tr><td>5</td><td><strong>A concluded matter</strong> — this file is finished, and here is its outcome</td><td class="box">☐ Yes ☐ Partly ☐ No</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>One line only.</strong> Judged by what it could not say, what did this system turn out to be?</p>
+    <div class="card write"><hr class="rule-line"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">3</span><span>Demonstration</span><span class="t">10 min</span></div>
+    <h2>A deadline with nowhere to live</h2>
+    <p>Your facilitator will create a task carrying a deadline, assign it, and then open the matter that deadline belongs to.</p>
+    <div class="ask">
+      <span class="label">Commit before the reveal</span>
+      <p>What will appear on the matter?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">4</span><span>Promise tracing</span><span class="t">20 min</span></div>
+    <h2>What has to exist for this to be true?</h2>
+    <p>Every promise depends on a structure capable of satisfying it. Where that structure is absent, the promise was never translated into the model — and no amount of interface work rescues it.</p>
+    <p>For each objective, name the <strong>entity</strong> and the <strong>relationship</strong> required. Then give a verdict.</p>
+
+    <div class="obj">
+      <h3>1 · Shared case visibility across staff and clients</h3>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.6rem 0 0" class="box">☐ Satisfied &nbsp;&nbsp; ☐ Unsatisfiable — missing structure: ______________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <span class="tag">Headline promise</span>
+      <h3>2 · Deadline tracking and alerts</h3>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.6rem 0 0" class="box">☐ Satisfied &nbsp;&nbsp; ☐ Unsatisfiable — missing structure: ______________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <span class="tag">Headline promise</span>
+      <h3>3 · Court date and hearing management</h3>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.6rem 0 0" class="box">☐ Satisfied &nbsp;&nbsp; ☐ Unsatisfiable — missing structure: ______________________</p>
+      </div>
+    </div>
+
+    <div class="obj">
+      <h3>4 · Client satisfaction measurement</h3>
+      <div class="card write"><hr class="rule-line"><hr class="rule-line">
+        <p style="margin:.6rem 0 0" class="box">☐ Satisfied &nbsp;&nbsp; ☐ Unsatisfiable — missing structure: ______________________</p>
+      </div>
+    </div>
+
+    <div class="gate">
+      <p style="margin:0"><strong>The rule.</strong> A promise marked unsatisfiable must name the missing structure.<br>
+      <em>“Unsatisfiable because it's badly built”</em> — fails.<br>
+      <em>“Unsatisfiable because no hearing entity exists”</em> — passes.</p>
+    </div>
+    <p><strong>Of four stated objectives, how many are satisfiable on the model actually built?</strong> &nbsp; ____ of 4</p>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">5</span><span>Demonstration</span><span class="t">10 min</span></div>
+    <h2>A number that is wrong and looks fine</h2>
+    <p>Your facilitator will note how many matters the dashboard shows, then create one more — giving it a status the dashboard doesn't recognise.</p>
+    <div class="ask">
+      <span class="label">Commit before the reveal</span>
+      <p>How many matters will the dashboard show?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">6</span><span>Demonstration</span><span class="t">10 min</span></div>
+    <h2>The column that fell out</h2>
+    <p>Your facilitator will put the designers' prototype of the matter grid beside the table that actually shipped.</p>
+    <div class="ask">
+      <span class="label">Commit before the reveal</span>
+      <p>What is missing from the shipped screen — and why do you think it went?</p>
+    </div>
+    <div class="card write"><hr class="rule-line"></div>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">7</span><span>Convergence</span><span class="t">10 min</span></div>
+    <h2>What did you actually watch?</h2>
+    <p>Three failures. A missing task. A wrong number. A missing column. Before you open the panel below — and don't open it early — decide what they have in common.</p>
+
+    <details class="reveal">
+      <summary>Open when your facilitator says so</summary>
+      <div class="reveal-body">
+        <blockquote class="thesis">A system is defined by its entities and their relationships, not by its screens. Every screen-level failure you saw today is a domain-model failure wearing a costume.</blockquote>
+        <div class="scroll">
+        <table>
+          <thead><tr><th>What you saw</th><th>What it actually was</th></tr></thead>
+          <tbody>
+            <tr><td>The missing task</td><td>A missing <strong>relationship</strong> — everything dated belongs to a matter</td></tr>
+            <tr><td>The wrong number</td><td>A missing <strong>vocabulary</strong> — every classification is a controlled list</td></tr>
+            <tr><td>The missing column</td><td>The <strong>same missing relationship</strong>, surfacing somewhere else</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p style="margin-bottom:0">None of these was a design failure, and none was caught by testing. The dashboard returned the right answer to the query it ran. The screen had nothing to display. The deadline was recorded exactly as entered.</p>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <div class="seg"><span class="n">8</span><span>The question you take back</span><span class="t">10 min</span></div>
+    <h2>Your own system</h2>
+    <p>Return to the three questions you wrote at the start. Choose one, and convert it into the form you've been practising all morning:</p>
+    <div class="ask">
+      <p>Which entity and which relationship does this depend on — and do we have them?</p>
+    </div>
+    <div class="card write">
+      <hr class="rule-line"><hr class="rule-line"><hr class="rule-line">
+    </div>
+    <p>That question is the deliverable. It costs nothing to ask, it takes about four minutes to answer, and it is the single cheapest thing you can do to a roadmap before you approve it.</p>
+  </section>
+
+  <footer>
+    <p><strong>EX-01 · The Domain Model Is the Product · v1.0</strong><br>
+    An Executive Experience of the Academy. Derived from case study CS-001 and the standing libraries.<br>
+    All demonstrations run against a local instance with synthetic data. No real client data is used at any point.</p>
+  </footer>
+
+</div>
+</body>
+</html>
