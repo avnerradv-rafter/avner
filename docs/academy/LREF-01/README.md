@@ -11,6 +11,7 @@ LREF-01 defines how the Academy extracts durable intellectual property from an e
 | Document | Purpose |
 | --- | --- |
 | [`LREF-01-Methodology.md`](./LREF-01-Methodology.md) | **The framework.** Nine stages, 25 instruments, 16 quality gates, IP protocol, instantiation contract, worksheets, prompt library |
+| [`../libraries/`](../libraries/README.md) | **The standing libraries.** Pattern Library, Lesson Library, Instrument Library — the accumulating asset |
 | This file | Register, case-study index, and how to start a study |
 
 ## The nine stages
@@ -41,11 +42,13 @@ LREF-01 defines how the Academy extracts durable intellectual property from an e
 
 Studies feed three libraries that outlive any one analysis. These are the accumulating asset; case studies are their output.
 
-| Library | Fed by | Accumulation rule |
-| --- | --- | --- |
-| **Pattern Library** | S9, eight fixed categories | Observed in two subjects → *confirmed*. Contradicted → *contested*, annotated with conditions |
-| **Lesson Library** | S8 | Recurrence across independent subjects raises confidence — the strongest evidence a failure is structural, not incidental |
-| **Instrument Library** | §8, plus amendments | Retained while productive; retired after three barren studies |
+| Library | Location | Fed by | Accumulation rule |
+| --- | --- | --- | --- |
+| **Pattern Library** | [`../libraries/Pattern-Library.md`](../libraries/Pattern-Library.md) | S9, eight fixed categories | Observed in two subjects → *confirmed*. Contradicted → *contested*, annotated with conditions |
+| **Lesson Library** | [`../libraries/Lesson-Library.md`](../libraries/Lesson-Library.md) | S8 | Recurrence across independent subjects raises confidence — the strongest evidence a failure is structural, not incidental |
+| **Instrument Library** | [§8 of the methodology](./LREF-01-Methodology.md#8-the-instrument-library) | §8, plus amendments | Retained while productive; retired after three barren studies |
+
+The libraries are **instantiated at v1.0** from CS-001. They are the design authority: a builder should be able to work from them without reading any case study.
 
 **Synthesis cadence.** After every third case study, a synthesis pass reconciles the libraries and updates the reference model S6 compares against. Without it, the libraries grow without converging.
 
@@ -59,7 +62,7 @@ Studies feed three libraries that outlive any one analysis. These are the accumu
 6. Work the nine stages. Collect evidence verbatim and in parallel; synthesise once, centrally.
 7. Pass all 16 quality gates (§10). Write the executive summary last.
 8. Run the anti-pattern self-check (§11).
-9. Promote patterns and lessons to the libraries. Raise any deviations as §14 amendments.
+9. Promote patterns and lessons to the [standing libraries](../libraries/README.md), assigning patterns to the eight fixed categories. Raise any deviations as §14 amendments.
 
 ## The six doctrines
 
