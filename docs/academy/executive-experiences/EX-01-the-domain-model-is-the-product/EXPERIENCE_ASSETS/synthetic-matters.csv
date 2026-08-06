@@ -1,0 +1,16 @@
+matter_ref,client_name,matter_title,status,opened_on,assigned_to,note
+SYN-001,Aldergate Holdings Ltd,Supply agreement dispute,Open,2026-01-14,A. Okonkwo,Recognised status
+SYN-002,Brightmoor Cooperative,Lease forfeiture,Open,2026-01-22,R. Vasquez,Recognised status
+SYN-003,Castellan Freight,Debt recovery,In Progress,2026-02-03,A. Okonkwo,Recognised status
+SYN-004,Dunmore Estates,Boundary claim,In Progress,2026-02-11,M. Lindqvist,Recognised status
+SYN-005,Everly Textiles,Shareholder dispute,Closed,2026-02-19,R. Vasquez,Recognised status
+SYN-006,Fenwick Marine,Charterparty arbitration,Open,2026-03-02,M. Lindqvist,Recognised status
+SYN-007,Garrowby Trust,Trustee removal,In Progress,2026-03-09,A. Okonkwo,Recognised status
+SYN-008,Halloway Print,Unfair dismissal,Closed,2026-03-15,S. Nakamura,Recognised status
+SYN-009,Ilminster Group,Contract termination,In Review,2026-03-21,R. Vasquez,DRIFT — outside recognised set (D1)
+SYN-010,Jarrow Logistics,Insolvency petition,Awaiting Client,2026-03-28,M. Lindqvist,DRIFT — outside recognised set
+SYN-011,Kelbrook Media,Defamation claim,on hold,2026-04-04,S. Nakamura,DRIFT — casing and value both outside set
+SYN-012,Lanchester Foods,Product liability,OPEN,2026-04-12,A. Okonkwo,DRIFT — casing only; recognised value mis-cased
+SYN-013,Marchwood Care,Regulatory investigation,Pending review,2026-04-18,S. Nakamura,DRIFT — outside recognised set
+SYN-014,Northgate Rail,Procurement challenge,Open,2026-04-25,R. Vasquez,Recognised status
+SYN-015,Oxleigh Partners,Partnership dissolution,In Progress,2026-05-06,M. Lindqvist,Recognised status
