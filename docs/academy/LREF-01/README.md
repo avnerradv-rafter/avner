@@ -12,6 +12,7 @@ LREF-01 defines how the Academy extracts durable intellectual property from an e
 | --- | --- |
 | [`LREF-01-Methodology.md`](./LREF-01-Methodology.md) | **The framework.** Nine stages, 25 instruments, 16 quality gates, IP protocol, instantiation contract, worksheets, prompt library |
 | [`../libraries/`](../libraries/README.md) | **The standing libraries.** Pattern Library, Lesson Library, Instrument Library — the accumulating asset |
+| [`../demonstration-library/`](../demonstration-library/README.md) | **The Demonstration Library.** Ten reproducible demonstrations in which a structural defect is felt rather than described. Carries a binding safety protocol |
 | This file | Register, case-study index, and how to start a study |
 
 ## The nine stages
