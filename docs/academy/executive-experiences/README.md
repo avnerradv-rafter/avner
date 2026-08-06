@@ -32,6 +32,11 @@ Where a production decision adapts canonical material — condensing a four-hour
 | Code | Experience | Duration | Audience | Status |
 | --- | --- | --- | --- | --- |
 | [**EX-01**](./EX-01-the-domain-model-is-the-product/EXPERIENCE_SPEC.md) | [The Domain Model Is the Product](./EX-01-the-domain-model-is-the-product/EXPERIENCE_SPEC.md) | 90 min | Executives who commission, fund or approve software | **Complete** — 4/4 artifacts |
+| [**EX-01-IL**](./EX-01-IL-the-domain-model-is-the-product/EXPERIENCE_SPEC.md) | [The Domain Model Is the Product — Israeli multi-practice variant](./EX-01-IL-the-domain-model-is-the-product/EXPERIENCE_SPEC.md) | 90 min | Partners at an Israeli multi-practice firm. Learner-facing artifacts in Hebrew, RTL | **Complete** — 4/4 artifacts |
+
+### Variants
+
+A variant carries its parent's code with a suffix (`EX-01-IL`), and shares the parent's thesis, spine, production rules and quality gates. It localises **instances only** — the demonstrations, datasets and worksheet content — and records what changed in an adaptation table and a localisation note in its specification. A variant that alters a principle, a rule or a gate is not a variant; it is a new Experience and takes a new code.
 
 ---
 
