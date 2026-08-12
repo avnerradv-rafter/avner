@@ -1,0 +1,25 @@
+{
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    },
+    "exclude": [
+      "node_modules",
+      "dist",
+      "build",
+      "*.html",
+      "*.md",
+      "*.zip"
+    ]
+  },
+  "fmt": {
+    "exclude": [
+      "node_modules",
+      "dist",
+      "build",
+      "*.html",
+      "*.md",
+      "*.zip"
+    ]
+  }
+}
