@@ -1,0 +1,151 @@
+diff --git a/core/auth/bridge.py b/core/auth/bridge.py
+index 97a3358..40a9837 100644
+--- a/core/auth/bridge.py
++++ b/core/auth/bridge.py
+@@ -213,11 +213,11 @@ class DeepDiveBridge:
+                     return json.load(f)
+             except:
+                 pass
+-        return {'provider': 'claude', 'api_keys': {}}
++        return {'provider': 'none', 'api_keys': {}}  # LOCAL PATCH: no implicit claude CLI
+ 
+     def is_available(self) -> bool:
+         settings = self._get_settings()
+-        provider = settings.get('provider', 'claude')
++        provider = settings.get('provider', 'none')
+ 
+         if provider == 'claude':
+             try:
+@@ -242,7 +242,7 @@ class DeepDiveBridge:
+     def _call(self, prompt: str, timeout: int = 300) -> str:
+         """Route to the configured provider."""
+         settings = self._get_settings()
+-        provider = settings.get('provider', 'claude')
++        provider = settings.get('provider', 'none')
+ 
+         if provider == 'claude_api':
+             return self._call_anthropic_api(prompt, settings, timeout)
+@@ -250,7 +250,9 @@ class DeepDiveBridge:
+             return self._call_ollama(prompt, settings, timeout)
+         elif provider == 'openai':
+             return self._call_openai_compat(prompt, settings, timeout)
+-        return self._call_claude_cli(prompt, timeout)
++        elif provider == 'claude':  # LOCAL PATCH: CLI only when explicitly selected
++            return self._call_claude_cli(prompt, timeout)
++        return "Error: no AI provider configured - open http://localhost:8766/settings"
+ 
+     def _web_search_for_prompt(self, prompt: str) -> str:
+         """Extract a search query from the prompt and run DDG + Yandex search.
+@@ -606,7 +608,7 @@ class DeepDiveBridge:
+         osint_data, feed_results = self._gather_osint(entity_name, enabled_feeds)
+ 
+         settings = self._get_settings()
+-        provider = settings.get('provider', 'claude')
++        provider = settings.get('provider', 'none')
+ 
+         if provider == 'ollama':
+             # Include investigation context so the model knows scope
+diff --git a/core/views/settings.py b/core/views/settings.py
+index 11cb18a..1107479 100644
+--- a/core/views/settings.py
++++ b/core/views/settings.py
+@@ -39,10 +39,10 @@ def save_settings(settings: dict) -> bool:
+         SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+         with open(SETTINGS_FILE, 'w') as f:
+             json.dump(settings, f, indent=2)
+-        try:
+-        os.chmod(SETTINGS_FILE, 0o600)
+-    except Exception:
+-        pass
++        try:  # LOCAL PATCH: fixed upstream IndentationError
++            os.chmod(SETTINGS_FILE, 0o600)
++        except Exception:
++            pass
+         return True
+     except:
+         return False
+diff --git a/server/app.py b/server/app.py
+index 4e748ff..20e5dd4 100644
+--- a/server/app.py
++++ b/server/app.py
+@@ -8,6 +8,7 @@ Routes are handled by modules in server/routes/.
+ import asyncio
+ import json
+ import os
++import re
+ import sys
+ import threading
+ from http.server import HTTPServer, BaseHTTPRequestHandler
+@@ -93,7 +94,16 @@ class RequestHandler(BaseHTTPRequestHandler):
+         else:
+             self._not_found()
+ 
++    def _origin_ok(self):
++        # LOCAL PATCH: refuse cross-site POSTs (upstream sends CORS '*').
++        origin = self.headers.get('Origin')
++        if not origin:
++            return True
++        return bool(re.match(r'^https?://(localhost|127\.0\.0\.1)(:\d+)?$', origin))
++
+     def do_POST(self):
++        if not self._origin_ok():
++            self.send_response(403); self.end_headers(); return
+         length = int(self.headers.get('Content-Length', 0))
+         body = json.loads(self.rfile.read(length)) if length > 0 else {}
+ 
+@@ -334,8 +344,8 @@ class RequestHandler(BaseHTTPRequestHandler):
+         elif path == '/auth/status':
+             available = state.BRIDGE.is_available()
+             settings = state.BRIDGE._get_settings()
+-            self._json({'authenticated': available, 'provider': settings.get('provider', 'claude'),
+-                        'user': {'method': settings.get('provider', 'claude')}})
++            self._json({'authenticated': available, 'provider': settings.get('provider', 'none'),
++                        'user': {'method': settings.get('provider', 'none')}})
+ 
+         elif path == '/usage':
+             from auth.bridge import USAGE
+@@ -719,19 +729,8 @@ async def main():
+     if _tor_up():
+         print("[DiveServer] Tor: running on 127.0.0.1:9050 — dark web search enabled")
+     else:
+-        print("[DiveServer] Tor: not detected — attempting to start...")
+-        try:
+-            import subprocess
+-            result = subprocess.run(['sudo', '-S', 'systemctl', 'start', 'tor'],
+-                input='3701\n', capture_output=True, text=True, timeout=10)
+-            import time as _time; _time.sleep(3)
+-            if _tor_up():
+-                print("[DiveServer] Tor: started successfully — dark web search enabled")
+-            else:
+-                print("[DiveServer] Tor: could not start — dark web search unavailable")
+-                print("[DiveServer]   Install: sudo apt install tor && sudo systemctl start tor")
+-        except Exception as e:
+-            print(f"[DiveServer] Tor: auto-start failed ({e}) — dark web search unavailable")
++        # LOCAL PATCH: upstream ran `sudo -S systemctl start tor` with a hardcoded password.
++        print("[DiveServer] Tor: not detected - dark web search unavailable (start Tor yourself if needed)")
+ 
+     if args.investigation:
+         state.INV_PATH = args.investigation
+@@ -754,7 +753,7 @@ async def main():
+     import websockets
+     print(f"[DiveServer] WebSocket on ws://localhost:8765")
+     print(f"[DiveServer] Open http://localhost:8766 in your browser")
+-    async with websockets.serve(handle_ws, "localhost", 8765):
++    async with websockets.serve(handle_ws, "localhost", 8765, origins=[None, "http://localhost:8766", "http://127.0.0.1:8766"]):  # LOCAL PATCH
+         await asyncio.Future()
+ 
+ 
+diff --git a/server/state.py b/server/state.py
+index b4572da..bda4409 100644
+--- a/server/state.py
++++ b/server/state.py
+@@ -51,7 +51,8 @@ def get_root():
+ 
+ def get_investigations_root():
+     """Get the investigations directory."""
+-    return os.path.join(_root, 'investigations')
++    # LOCAL PATCH: allow per-case storage outside the application directory
++    return os.environ.get('DEEPDIVE_INVESTIGATIONS_DIR') or os.path.join(_root, 'investigations')
+ 
+ 
+ def get_investigations_dir():

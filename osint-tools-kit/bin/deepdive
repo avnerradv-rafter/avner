@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# DeepDive local launcher (loopback only, one server at a time, per-case storage).
+set -euo pipefail
+APP="${DEEPDIVE_HOME:-$HOME/tools/deepdive}"
+PY="$APP/.venv/bin/python"; [[ -x "$PY" ]] || PY="$APP/.venv/Scripts/python.exe"  # Linux/macOS or Windows (Git Bash)
+CASES="${OSINT_CASES_DIR:-$HOME/osint-cases}"
+PIDF="${XDG_STATE_HOME:-$HOME/.local/state}/deepdive.pid"
+CASEF="${PIDF%.pid}.case"
+SETTINGS="$HOME/.deepdive/settings.json"
+
+port_busy() { "$PY" - "$1" <<'P'
+import socket,sys
+s=socket.socket(); s.settimeout(1)
+sys.exit(0 if s.connect_ex(('127.0.0.1',int(sys.argv[1])))==0 else 1)
+P
+}
+running() { [[ -f "$PIDF" ]] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
+safe_case() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "ERROR: case id must match [A-Za-z0-9._-]+" >&2; exit 2; }; }
+
+provider_status() {
+  "$PY" - "$SETTINGS" <<'P'
+import json,os,sys
+f=sys.argv[1]
+if not os.path.exists(f): print("provider: NOT CONFIGURED (no ~/.deepdive/settings.json) - AI research disabled"); sys.exit()
+s=json.load(open(f)); p=s.get('provider','none'); k=s.get('api_keys',{})
+has={'openai':bool(k.get('openai')),'claude_api':bool(k.get('claude_api')),'ollama':True,'claude':True}.get(p,False)
+print(f"provider: {p} | key present: {has}")
+P
+}
+
+case "${1:-help}" in
+  start)
+    CASE="${2:?usage: deepdive start <case-id> [investigation-id]}"; safe_case "$CASE"; INV="${3:-}"; [[ -z "$INV" ]] || safe_case "$INV"
+    if running; then echo "Already running (pid $(cat "$PIDF"), case $(cat "$CASEF" 2>/dev/null)). URL: http://localhost:8766/board"; exit 0; fi
+    for p in 8766 8765; do if port_busy $p; then echo "ERROR: port $p already in use by another process - not starting a duplicate." >&2; exit 3; fi; done
+    DIR="$CASES/$CASE/deepdive"; mkdir -p "$DIR"
+    cd "$APP"
+    PYTHONPATH="$APP" DEEPDIVE_INVESTIGATIONS_DIR="$DIR" nohup "$PY" server/app.py ${INV:+"$DIR/$INV"} ${DEEPDIVE_SEARCH:+--search "$DEEPDIVE_SEARCH"} >>"$DIR/server.log" 2>&1 &
+    echo $! >"$PIDF"; echo "$CASE" >"$CASEF"
+    for i in $(seq 1 30); do port_busy 8766 && break; sleep 0.5; done
+    if port_busy 8766; then
+      echo "DeepDive started (pid $(cat "$PIDF")) for case '$CASE'"
+      echo "Board:    http://localhost:8766/board"
+      echo "Settings: http://localhost:8766/settings"
+      echo "Data:     $DIR"; echo "Log:      $DIR/server.log"; provider_status
+    else echo "ERROR: server did not come up; see $DIR/server.log" >&2; exit 4; fi ;;
+  stop)
+    if running; then kill "$(cat "$PIDF")"; rm -f "$PIDF" "$CASEF"; echo "DeepDive stopped."; else rm -f "$PIDF"; echo "DeepDive not running."; fi ;;
+  status)
+    if running; then echo "running pid $(cat "$PIDF") case $(cat "$CASEF" 2>/dev/null) - http://localhost:8766/board"; else echo "not running"; fi
+    provider_status ;;
+  graph) shift; exec "$PY" "${DEEPDIVE_GRAPH_HELPER:-$HOME/.claude/skills/deepdive/scripts/dd_graph.py}" "$@" ;;
+  *) echo "usage: deepdive {start <case-id> [investigation-id]|stop|status|graph <init|add|board|summary|list> ...}"; exit 1 ;;
+esac

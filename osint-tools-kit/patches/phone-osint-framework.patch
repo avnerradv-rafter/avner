@@ -1,0 +1,49 @@
+diff --git a/phone_osint_master.py b/phone_osint_master.py
+index 09aa802..e0be503 100644
+--- a/phone_osint_master.py
++++ b/phone_osint_master.py
+@@ -20,7 +20,7 @@ class PhoneOSINTMaster:
+     def __init__(self, phone_number):
+         self.phone_number = phone_number
+         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+-        self.output_dir = Path(f"results/{self.timestamp}_{phone_number}")
++        self.output_dir = Path(os.environ.get("PHONE_OSINT_RESULTS_DIR", "results")) / f"{self.timestamp}_{phone_number}"  # LOCAL PATCH
+         self.output_dir.mkdir(parents=True, exist_ok=True)
+         
+         # Setup logging
+diff --git a/web_interface.py b/web_interface.py
+index 8004c14..19d2433 100644
+--- a/web_interface.py
++++ b/web_interface.py
+@@ -782,7 +782,7 @@ def investigate():
+ 
+         try:
+             # Build command with identity data
+-            cmd = [python_path, 'phone_osint_master.py', phone]
++            cmd = [sys.executable, 'phone_osint_master.py', phone]  # LOCAL PATCH: use running venv interpreter
+             if identity_data:
+                 cmd.append(json.dumps(identity_data))
+                 output_queue.put(('info', f"🎯 Enhanced investigation with identity data: {list(identity_data.keys())}"))
+@@ -809,7 +809,7 @@ def investigate():
+ 
+             if process.returncode == 0:
+                 # Find latest report
+-                reports = list(Path('results').glob('*/investigation_report.html'))
++                reports = list(Path(os.environ.get('PHONE_OSINT_RESULTS_DIR', 'results')).glob('*/investigation_report.html'))  # LOCAL PATCH
+                 if reports:
+                     latest_report = max(reports, key=lambda p: p.stat().st_mtime)
+                     output_queue.put({
+@@ -959,8 +959,9 @@ def stream_output(session_id):
+ 
+ @app.route('/report/<report_id>')
+ def view_report(report_id):
+-    report_path = Path(f'results/{report_id}/investigation_report.html')
++    report_path = Path(os.environ.get('PHONE_OSINT_RESULTS_DIR', 'results')) / report_id / 'investigation_report.html'  # LOCAL PATCH
+     return report_path.read_text()
+ 
+ if __name__ == '__main__':
+-    app.run(debug=True, host='0.0.0.0', port=5000)
+\ No newline at end of file
++    # LOCAL PATCH: upstream used debug=True on 0.0.0.0 (Werkzeug debugger = RCE). Loopback only.
++    app.run(debug=False, host='127.0.0.1', port=int(os.environ.get('WEB_PORT', '5000')))
+\ No newline at end of file
