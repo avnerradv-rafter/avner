@@ -1,0 +1,10 @@
+{
+  "_comment": "Copy to ~/.deepdive/settings.json (or use http://localhost:8766/settings). Pick ONE provider. Keys stay local; never commit this file.",
+  "provider": "none",
+  "api_keys": { "openai": "", "claude_api": "" },
+  "openai_base_url": "https://api.openai.com/v1",
+  "openai_model": "gpt-4o-mini",
+  "ollama_url": "http://localhost:11434",
+  "ollama_model": "",
+  "default_depth": "standard"
+}
