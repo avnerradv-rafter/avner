@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אטלס קלוד לעורכי דין - מפה אינטראקטיבית</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;700;900&family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* Law Office Theme Colors */
+            --research-color: #3b82f6;      /* Blue - Research */
+            --contracts-color: #ef4444;     /* Red - Contracts */
+            --writing-color: #8b5cf6;       /* Purple - Writing */
+            --communication-color: #06b6d4; /* Cyan - Communication */
+            --management-color: #10b981;    /* Green - Management */
+            --compliance-color: #f59e0b;    /* Amber - Compliance */
+            --billing-color: #ec4899;       /* Pink - Billing */
+
+            --ocean-bg: #0f172a;
+            --ocean-grid: rgba(255, 255, 255, 0.03);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--ocean-bg);
+            font-family: 'Heebo', sans-serif;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .map-viewport {
+            width: 100vw;
+            height: 100vh;
+            overflow: auto;
+            position: relative;
+            background-image:
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0) 0%, rgba(2, 6, 23, 0.8) 100%),
+                linear-gradient(var(--ocean-grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--ocean-grid) 1px, transparent 1px);
+            background-size: 100% 100%, 50px 50px, 50px 50px;
+            background-attachment: local;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .map-canvas {
+            width: 1800px;
+            height: 1100px;
+            position: relative;
+            transform-origin: center center;
+            animation: zoomIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes zoomIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .continent {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 45%;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(8px);
+            transition: all 0.5s ease;
+            cursor: default;
+        }
+
+        .continent::before {
+            content: '';
+            position: absolute;
+            inset: -15px;
+            border: 1px dashed;
+            border-radius: inherit;
+            opacity: 0.3;
+            animation: rotateSlow 40s linear infinite;
+        }
+
+        .continent::after {
+            content: '';
+            position: absolute;
+            inset: -30px;
+            border: 1px solid;
+            border-radius: inherit;
+            opacity: 0.1;
+            animation: rotateSlow 60s linear infinite reverse;
+        }
+
+        @keyframes rotateSlow {
+            100% { transform: rotate(360deg); }
+        }
+
+        .continent:hover {
+            background: rgba(30, 41, 59, 0.7);
+            z-index: 50;
+            transform: scale(1.03);
+        }
+
+        .hex-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            padding: 25px;
+            z-index: 2;
+        }
+
+        .hex-node {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 65px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .hex-node:hover {
+            transform: translateY(-6px) scale(1.15);
+            z-index: 10;
+        }
+
+        .hex-shape {
+            width: 55px;
+            height: 64px;
+            background-color: rgba(15, 23, 42, 0.9);
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Assistant', sans-serif;
+            font-weight: 900;
+            font-size: 16px;
+            border: 2.5px solid;
+            box-shadow: inset 0 0 15px rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .hex-node:hover .hex-shape {
+            background-color: currentColor;
+            color: var(--ocean-bg);
+            box-shadow: 0 0 25px currentColor, inset 0 0 15px rgba(0,0,0,0.3);
+        }
+
+        .hex-label {
+            margin-top: 8px;
+            font-size: 10px;
+            text-align: center;
+            line-height: 1.1;
+            font-weight: 700;
+            color: #94a3b8;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            max-width: 70px;
+            white-space: normal;
+        }
+
+        .hex-node:hover .hex-label {
+            opacity: 1;
+            color: #fff;
+            text-shadow: 0 0 8px rgba(255,255,255,0.5);
+        }
+
+        /* Continent Styles */
+        .cont-research {
+            top: 8%; left: 5%; width: 400px; height: 360px;
+            border: 2.5px solid var(--research-color); color: var(--research-color);
+            border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
+            box-shadow: 0 0 50px rgba(59, 130, 246, 0.15);
+        }
+        .cont-research::before, .cont-research::after { border-color: var(--research-color); }
+        .cont-research .hex-shape { border-color: var(--research-color); color: var(--research-color); }
+
+        .cont-contracts {
+            top: 5%; left: 42%; width: 380px; height: 340px;
+            border: 2.5px solid var(--contracts-color); color: var(--contracts-color);
+            border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+            box-shadow: 0 0 50px rgba(239, 68, 68, 0.15);
+        }
+        .cont-contracts::before, .cont-contracts::after { border-color: var(--contracts-color); }
+        .cont-contracts .hex-shape { border-color: var(--contracts-color); color: var(--contracts-color); }
+
+        .cont-writing {
+            top: 10%; right: 8%; width: 370px; height: 350px;
+            border: 2.5px solid var(--writing-color); color: var(--writing-color);
+            border-radius: 50% 50% 40% 60% / 60% 40% 50% 50%;
+            box-shadow: 0 0 50px rgba(139, 92, 246, 0.15);
+        }
+        .cont-writing::before, .cont-writing::after { border-color: var(--writing-color); }
+        .cont-writing .hex-shape { border-color: var(--writing-color); color: var(--writing-color); }
+
+        .cont-communication {
+            bottom: 20%; left: 10%; width: 380px; height: 360px;
+            border: 2.5px solid var(--communication-color); color: var(--communication-color);
+            border-radius: 45% 55% 65% 35% / 55% 45% 40% 60%;
+            box-shadow: 0 0 50px rgba(6, 182, 212, 0.15);
+        }
+        .cont-communication::before, .cont-communication::after { border-color: var(--communication-color); }
+        .cont-communication .hex-shape { border-color: var(--communication-color); color: var(--communication-color); }
+
+        .cont-management {
+            bottom: 8%; left: 42%; width: 360px; height: 340px;
+            border: 2.5px solid var(--management-color); color: var(--management-color);
+            border-radius: 55% 45% 35% 65% / 45% 55% 60% 40%;
+            box-shadow: 0 0 50px rgba(16, 185, 129, 0.15);
+        }
+        .cont-management::before, .cont-management::after { border-color: var(--management-color); }
+        .cont-management .hex-shape { border-color: var(--management-color); color: var(--management-color); }
+
+        .cont-compliance {
+            bottom: 25%; right: 22%; width: 340px; height: 320px;
+            border: 2.5px solid var(--compliance-color); color: var(--compliance-color);
+            border-radius: 35% 65% 55% 45% / 50% 50% 40% 60%;
+            box-shadow: 0 0 50px rgba(245, 158, 11, 0.15);
+        }
+        .cont-compliance::before, .cont-compliance::after { border-color: var(--compliance-color); }
+        .cont-compliance .hex-shape { border-color: var(--compliance-color); color: var(--compliance-color); }
+
+        .cont-billing {
+            bottom: 12%; right: 5%; width: 300px; height: 280px;
+            border: 2.5px solid var(--billing-color); color: var(--billing-color);
+            border-radius: 65% 35% 45% 55% / 40% 60% 50% 50%;
+            box-shadow: 0 0 50px rgba(236, 72, 153, 0.15);
+        }
+        .cont-billing::before, .cont-billing::after { border-color: var(--billing-color); }
+        .cont-billing .hex-shape { border-color: var(--billing-color); color: var(--billing-color); }
+
+        .continent-title {
+            position: absolute;
+            top: -22px;
+            background: var(--ocean-bg);
+            padding: 4px 18px;
+            border: 1.5px solid currentColor;
+            border-radius: 25px;
+            font-size: 13px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            box-shadow: 0 0 12px currentColor;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 5;
+        }
+
+        .sea-label {
+            position: absolute;
+            font-family: 'Assistant', sans-serif;
+            color: rgba(148, 163, 184, 0.35);
+            font-size: 22px;
+            font-weight: 300;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            pointer-events: none;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .map-ui {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .map-title-card {
+            position: absolute;
+            top: 30px; right: 30px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 25px 35px;
+            border-radius: 15px;
+            text-align: right;
+            border-right: 5px solid #60a5fa;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            max-width: 300px;
+        }
+
+        .map-title-card h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(96, 165, 250, 0.3);
+        }
+
+        .map-title-card .subtitle {
+            font-size: 11px;
+            color: #60a5fa;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+
+        .map-title-card p {
+            font-size: 12px;
+            color: #cbd5e1;
+            margin-top: 12px;
+            line-height: 1.5;
+        }
+
+        .compass {
+            position: absolute;
+            bottom: 40px; left: 40px;
+            width: 130px; height: 130px;
+            opacity: 0.7;
+            pointer-events: auto;
+        }
+
+        .info-panel {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 20px 25px;
+            border-radius: 12px;
+            max-width: 280px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        .info-panel strong {
+            color: #e2e8f0;
+        }
+
+        .legend {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255,255,255,0.12);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        .legend-title {
+            font-size: 12px;
+            font-weight: 900;
+            color: #e2e8f0;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 11px;
+            color: #cbd5e1;
+        }
+
+        .legend-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="map-ui">
+        <div class="map-title-card">
+            <h1><i class="fa-solid fa-book-open-reader"></i> אטלס קלוד</h1>
+            <div class="subtitle">מדריך משרדי חוק</div>
+            <p>מפה אינטראקטיבית לשימוש בקלוד לשיפור יעילות המשרד המשפטי</p>
+        </div>
+
+        <div class="legend">
+            <div class="legend-title"><i class="fa-solid fa-map"></i> האזורים</div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--research-color);"></div>
+                <span>חקר משפטי וניתוח</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--contracts-color);"></div>
+                <span>הסכמים וחוזים</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--writing-color);"></div>
+                <span>כתיבה משפטית</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--communication-color);"></div>
+                <span>תקשורת עם לקוחות</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--management-color);"></div>
+                <span>ניהול משפטי</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--compliance-color);"></div>
+                <span>ציות תקינה</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: var(--billing-color);"></div>
+                <span>תשלום וחיוב</span>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <strong><i class="fa-solid fa-circle-info"></i> טיפ:</strong><br>
+            עברו על כל אזור בעכבר כדי לראות את היכולות הספציפיות
+        </div>
+
+        <div class="compass" title="מצפן משפטי">
+            <div class="relative w-full h-full flex flex-col items-center justify-center">
+                <span class="text-slate-400 font-bold mb-1 text-sm">צפון</span>
+                <div class="relative w-20 h-20 border border-slate-600 rounded-full flex items-center justify-center shadow-[0_0_25px_rgba(255,255,255,0.08)]">
+                    <i class="fa-solid fa-gavel text-3xl text-slate-500"></i>
+                    <div class="absolute inset-0 border border-dashed border-slate-500 rounded-full" style="animation: spin 25s linear infinite;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-viewport">
+        <div class="map-canvas">
+
+            <!-- Sea Labels -->
+            <div class="sea-label" style="top: 30%; left: 22%; transform: rotate(-12deg);">
+                ים החקר<br><span style="font-size: 16px; letter-spacing: 3px;">RESEARCH SEA</span>
+            </div>
+            <div class="sea-label" style="top: 22%; right: 25%; transform: rotate(8deg);">
+                מיצר הכתיבה<br><span style="font-size: 16px; letter-spacing: 3px;">WRITING STRAIT</span>
+            </div>
+            <div class="sea-label" style="bottom: 40%; left: 35%; transform: rotate(5deg); opacity: 0.25;">
+                המפרץ המשפטי
+            </div>
+            <div class="sea-label" style="bottom: 30%; right: 32%; transform: rotate(-10deg); opacity: 0.25; font-size: 18px;">
+                Bay of Efficiency
+            </div>
+
+            <!-- 1. Research & Legal Research -->
+            <div class="continent cont-research">
+                <div class="continent-title"><i class="fa-solid fa-magnifying-glass"></i> חקר משפטי</div>
+                <div class="hex-grid" style="max-width: 300px; margin-top: 25px;">
+                    <div class="hex-node"><div class="hex-shape">חק</div><span class="hex-label">חקר חוקים וכללים</span></div>
+                    <div class="hex-node" style="margin-top: 35px;"><div class="hex-shape">קד</div><span class="hex-label">קדיישן דין</span></div>
+                    <div class="hex-node"><div class="hex-shape">פסק</div><span class="hex-label">פסקי דין וראיות</span></div>
+                    <div class="hex-node" style="margin-top: -15px;"><div class="hex-shape">עמ</div><span class="hex-label">עמדות משפטיות</span></div>
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">אנ</div><span class="hex-label">ניתוח מקרים דומים</span></div>
+                </div>
+            </div>
+
+            <!-- 2. Contracts -->
+            <div class="continent cont-contracts">
+                <div class="continent-title"><i class="fa-solid fa-file-contract"></i> הסכמים וחוזים</div>
+                <div class="hex-grid" style="max-width: 290px; margin-top: 20px;">
+                    <div class="hex-node" style="margin-top: 20px;"><div class="hex-shape">הס</div><span class="hex-label">בדיקת הסכמים</span></div>
+                    <div class="hex-node"><div class="hex-shape">טיוטה</div><span class="hex-label">טיוטת חוזים</span></div>
+                    <div class="hex-node" style="margin-top: 20px;"><div class="hex-shape">סכנ</div><span class="hex-label">זיהוי סיכונים</span></div>
+                    <div class="hex-node" style="margin-top: -10px;"><div class="hex-shape">ערוך</div><span class="hex-label">עריכת מסמכים</span></div>
+                </div>
+            </div>
+
+            <!-- 3. Legal Writing -->
+            <div class="continent cont-writing">
+                <div class="continent-title"><i class="fa-solid fa-pen-fancy"></i> כתיבה משפטית</div>
+                <div class="hex-grid" style="max-width: 280px; margin-top: 20px;">
+                    <div class="hex-node" style="margin-top: 25px;"><div class="hex-shape">דו״ח</div><span class="hex-label">דוחות משפטיים</span></div>
+                    <div class="hex-node"><div class="hex-shape">ערעור</div><span class="hex-label">כתיבת ערעורים</span></div>
+                    <div class="hex-node" style="margin-top: 25px;"><div class="hex-shape">דעה</div><span class="hex-label">דעות משפטיות</span></div>
+                    <div class="hex-node" style="margin-top: -10px;"><div class="hex-shape">עדות</div><span class="hex-label">הצהרות והגנות</span></div>
+                </div>
+            </div>
+
+            <!-- 4. Client Communication -->
+            <div class="continent cont-communication">
+                <div class="continent-title"><i class="fa-solid fa-envelope"></i> תקשורת לקוחות</div>
+                <div class="hex-grid" style="max-width: 290px; margin-top: 25px;">
+                    <div class="hex-node"><div class="hex-shape">מכ</div><span class="hex-label">מכתבים משפטיים</span></div>
+                    <div class="hex-node" style="margin-top: 35px;"><div class="hex-shape">הסבר</div><span class="hex-label">הסברות מורכבות</span></div>
+                    <div class="hex-node"><div class="hex-shape">עדכ</div><span class="hex-label">עדכוני לקוחות</span></div>
+                    <div class="hex-node" style="margin-top: -15px;"><div class="hex-shape">שאלות</div><span class="hex-label">מענה לשאלות</span></div>
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">דיון</div><span class="hex-label">דיוני עורך-לקוח</span></div>
+                </div>
+            </div>
+
+            <!-- 5. Case Management -->
+            <div class="continent cont-management">
+                <div class="continent-title"><i class="fa-solid fa-list-check"></i> ניהול משפטי</div>
+                <div class="hex-grid" style="max-width: 270px; margin-top: 20px;">
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">לו״ז</div><span class="hex-label">לוחות זמנים</span></div>
+                    <div class="hex-node"><div class="hex-shape">ארגון</div><span class="hex-label">ארגון מקרים</span></div>
+                    <div class="hex-node" style="margin-top: 20px;"><div class="hex-shape">דו״ח</div><span class="hex-label">דוחות התקדמות</span></div>
+                    <div class="hex-node" style="margin-top: -10px;"><div class="hex-shape">עדכ</div><span class="hex-label">עדכוני שלבים</span></div>
+                </div>
+            </div>
+
+            <!-- 6. Compliance & Regulations -->
+            <div class="continent cont-compliance">
+                <div class="continent-title"><i class="fa-solid fa-shield-halved"></i> ציות תקינה</div>
+                <div class="hex-grid" style="max-width: 260px; margin-top: 15px;">
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">תקן</div><span class="hex-label">ציות תקנות</span></div>
+                    <div class="hex-node"><div class="hex-shape">בדיקה</div><span class="hex-label">בדיקות ודילוגנס</span></div>
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">סיכון</div><span class="hex-label">הערכת סיכונים</span></div>
+                </div>
+            </div>
+
+            <!-- 7. Billing & Time Tracking -->
+            <div class="continent cont-billing">
+                <div class="continent-title"><i class="fa-solid fa-receipt"></i> חיוב</div>
+                <div class="hex-grid" style="max-width: 220px; margin-top: 15px;">
+                    <div class="hex-node" style="margin-top: 15px;"><div class="hex-shape">זמן</div><span class="hex-label">ניתור שעות</span></div>
+                    <div class="hex-node"><div class="hex-shape">חיוב</div><span class="hex-label">חיוביות</span></div>
+                    <div class="hex-node" style="margin-top: 12px;"><div class="hex-shape">דו״ח</div><span class="hex-label">דוחות כספיים</span></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
